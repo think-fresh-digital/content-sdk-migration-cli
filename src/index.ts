@@ -2,6 +2,7 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
+import { analyzeCodebase } from './analyser.js';
 
 const program = new Command();
 
@@ -15,9 +16,10 @@ program
 program
   .command('analyse')
   .description('Analyse a local codebase')
-  .action(() => {
-    console.log(chalk.green('Starting analysis...'));
-    // TODO: Implement analysis logic
+  .argument('<path>', 'Path to the root of the JSS project')
+  .action(async path => {
+    console.log(chalk.blue(`🚀 Starting analysis of codebase at: ${path}`));
+    await analyzeCodebase(path);
   });
 
 program.parse();

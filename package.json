@@ -1,11 +1,15 @@
 {
   "name": "content-sdk-migration-cli",
   "version": "0.1.0",
+  "bin": {
+    "content-sdk-migration": "./dist/index.js"
+  },
   "type": "module",
   "description": "AI-powered CLI to accelerate the migration of Sitecore JSS Next.js apps to the Content SDK.",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "format": "prettier --write .",

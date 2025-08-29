@@ -14,8 +14,10 @@ program
   .version('0.1.0');
 
 program
-  .command('analyse')
-  .description('Analyse a local codebase')
+  .command('report')
+  .description(
+    'Analyse a local codebase and generate a Content SDK migration report'
+  )
   .argument('<path>', 'Path to the root of the JSS project')
   .action(async path => {
     console.log(chalk.blue(`🚀 Starting analysis of codebase at: ${path}`));

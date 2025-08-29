@@ -10,6 +10,9 @@ export async function analyzeCodebase(projectPath: string) {
   const targetExtensions = ['ts', 'tsx'];
   const globPattern = `**/*.{${targetExtensions.join(',')}}`;
 
+  // Add specific pattern for package.json files
+  const packageJsonPattern = '**/package.json';
+
   // 2. Load and parse the .gitignore file
   const ig = ignore();
   const gitignorePath = path.join(projectPath, '.gitignore');
@@ -22,20 +25,34 @@ export async function analyzeCodebase(projectPath: string) {
     '.next',
     'dist',
     'build',
-    '.vscode',
-    '.github',
-    '.sitecore',
-    '.config',
-    '.env',
-    '.env.local',
+    'local-containers',
+    'spa-starters',
+    'byoc',
+    'feaas',
+    'temp',
+    'api',
+    'next-env.d.ts',
+    'generate-component-builder',
+    'scaffold-component',
+    'sitemap-fetcher',
+    'site-resolver',
+    'extract-path',
   ]);
 
   // 3. Find all matching files using glob
-  const allFiles = await glob(globPattern, {
+  const sourceFiles = await glob(globPattern, {
     cwd: projectPath, // Search within the user's project directory
     absolute: true, // Get absolute paths for easier reading
     dot: true, // Include dotfiles if any (unlikely for src)
   });
+
+  const packageJsonFiles = await glob(packageJsonPattern, {
+    cwd: projectPath,
+    absolute: true,
+    dot: true,
+  });
+
+  const allFiles = [...sourceFiles, ...packageJsonFiles];
 
   // 4. Filter out ignored files
   const relevantFiles = allFiles.filter(file => {

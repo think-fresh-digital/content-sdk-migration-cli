@@ -158,18 +158,17 @@ async function readAndAnalyzeFiles(projectPath: string, filePaths: string[]) {
     console.log(chalk.blue('📝 Finalising job and generating report...'));
 
     // This will be updated when the finalise endpoint is implemented
-    /*const finalizeResponse = await axios.post(
-      `${SERVICE_HOST}/api/jobs/${jobId}/finalise?code=${FINALISE_JOB_SERVICE_KEY}`
+    const finalizeResponse = await axios.post(
+      `${config.SERVICE_HOST}/api/jobs/${jobId}/finalise?code=${config.FINALISE_JOB_SERVICE_KEY}`
     );
-    const { reportUrl } = finalizeResponse.data;*/
+    const { reportUrl } = finalizeResponse.data;
 
     // 4. Display the final report URL
     console.log(
       chalk.bold.green('\n🎉 Your migration analysis report is ready!')
     );
 
-    // TODO: Add the report URL here
-    //console.log(chalk.underline.cyan(reportUrl));
+    console.log(chalk.underline.cyan(reportUrl));
   } catch (error) {
     console.error(
       chalk.red('\n❌ An error occurred during the analysis process.')

@@ -7,19 +7,33 @@ import axios from 'axios';
 
 // --- Configuration ---
 // The URL for the deployed backend service. Use an environment variable for this.
-const SERVICE_HOST = process.env.SERVICE_HOST || 'http://localhost:7071';
-const INITIALISE_JOB_SERVICE_KEY = process.env.INITIALISE_JOB_SERVICE_KEY;
-const ANALYSE_FILE_SERVICE_KEY = process.env.ANALYSE_FILE_SERVICE_KEY;
-const FINALISE_JOB_SERVICE_KEY = process.env.FINALISE_JOB_SERVICE_KEY;
+function getConfig() {
+  return {
+    SERVICE_HOST: process.env.SERVICE_HOST || 'http://localhost:7071',
+    INITIALISE_JOB_SERVICE_KEY: process.env.INITIALISE_JOB_SERVICE_KEY,
+    ANALYSE_FILE_SERVICE_KEY: process.env.ANALYSE_FILE_SERVICE_KEY,
+    FINALISE_JOB_SERVICE_KEY: process.env.FINALISE_JOB_SERVICE_KEY,
+  };
+}
 
 export async function analyzeCodebase(projectPath: string) {
+  // Get configuration (this ensures environment variables are loaded)
+  const config = getConfig();
+
+  // Check if the project path exists
+  if (!fs.existsSync(projectPath)) {
+    throw new Error(`Project path does not exist: ${projectPath}`);
+  }
+
   // Check if SERVICE_HOST is not localhost and any service keys are missing
-  if (SERVICE_HOST !== 'http://localhost:7071') {
+  if (config.SERVICE_HOST !== 'http://localhost:7071') {
     const missingKeys: string[] = [];
-    if (!INITIALISE_JOB_SERVICE_KEY)
+    if (!config.INITIALISE_JOB_SERVICE_KEY)
       missingKeys.push('INITIALISE_JOB_SERVICE_KEY');
-    if (!ANALYSE_FILE_SERVICE_KEY) missingKeys.push('ANALYSE_FILE_SERVICE_KEY');
-    if (!FINALISE_JOB_SERVICE_KEY) missingKeys.push('FINALISE_JOB_SERVICE_KEY');
+    if (!config.ANALYSE_FILE_SERVICE_KEY)
+      missingKeys.push('ANALYSE_FILE_SERVICE_KEY');
+    if (!config.FINALISE_JOB_SERVICE_KEY)
+      missingKeys.push('FINALISE_JOB_SERVICE_KEY');
 
     if (missingKeys.length > 0) {
       throw new Error(
@@ -75,31 +89,53 @@ export async function analyzeCodebase(projectPath: string) {
     const relativePath = path.relative(projectPath, file);
     return !ig.ignores(relativePath);
   });
+
+  // 5. Filter files to only include Plugin, Middleware, or Package types
+  const filteredFiles = relevantFiles.filter(file => {
+    const relativePath = path.relative(projectPath, file);
+    const fileType = classifyFileType(relativePath);
+    return ['Plugin', 'Middleware', 'Package'].includes(fileType);
+  });
+
   console.log(
     chalk.green(`✅ Found ${relevantFiles.length} relevant source files.`)
   );
+  console.log(
+    chalk.blue(
+      `📁 Filtered to ${filteredFiles.length} files for analysis (Plugin, Middleware, Package only).`
+    )
+  );
 
   // Next step: Read file contents and send for analysis
-  readAndAnalyzeFiles(projectPath, relevantFiles);
+  await readAndAnalyzeFiles(projectPath, filteredFiles);
 }
 
 /**
  * Reads each file and sends it to the backend for analysis.
  */
 async function readAndAnalyzeFiles(projectPath: string, filePaths: string[]) {
+  // Get configuration (this ensures environment variables are loaded)
+  const config = getConfig();
+
   try {
     // 1. Start a new job to get a jobId
     console.log(chalk.blue('🚀 Initializing new analysis job...'));
+
     const jobResponse = await axios.get(
-      `${SERVICE_HOST}/api/jobs-initiate?code=${INITIALISE_JOB_SERVICE_KEY}`
+      `${config.SERVICE_HOST}/api/jobs-initiate?code=${config.INITIALISE_JOB_SERVICE_KEY}`
     );
+
     const { jobId } = jobResponse.data;
+
     console.log(chalk.gray(`Job ID: ${jobId}`));
 
     // 2. Send all files for analysis concurrently
     console.log(
-      chalk.blue(`📡 Uploading ${filePaths.length} files for analysis...`)
+      chalk.blue(
+        `📡 Uploading ${filePaths.length} files for analysis (Plugin, Middleware, Package only)...`
+      )
     );
+
     const analysisPromises = filePaths.map(async filePath => {
       const fileContents = fs.readFileSync(filePath, 'utf-8');
       const relativePath = path.relative(projectPath, filePath);
@@ -108,13 +144,14 @@ async function readAndAnalyzeFiles(projectPath: string, filePaths: string[]) {
       const payload = { filePath: relativePath, fileType, fileContents };
 
       return axios.post(
-        `${SERVICE_HOST}/api/jobs/${jobId}/analyse-file?code=${ANALYSE_FILE_SERVICE_KEY}`,
+        `${config.SERVICE_HOST}/api/jobs/${jobId}/analyse-file?code=${config.ANALYSE_FILE_SERVICE_KEY}`,
         payload
       );
     });
 
     // Wait for all file uploads to complete
     await Promise.all(analysisPromises);
+
     console.log(chalk.green('✅ All files analyzed successfully.'));
 
     // 3. Finalize the job to get the report
@@ -137,15 +174,42 @@ async function readAndAnalyzeFiles(projectPath: string, filePaths: string[]) {
     console.error(
       chalk.red('\n❌ An error occurred during the analysis process.')
     );
-    if (axios.isAxiosError(error) && error.response) {
-      console.error(
-        chalk.red(
-          `[${error.response.status}] ${JSON.stringify(error.response.data)}`
-        )
-      );
+
+    // Log detailed error information
+    if (axios.isAxiosError(error)) {
+      if (error.response) {
+        // Server responded with error status
+        console.error(
+          chalk.red(
+            `HTTP Error [${error.response.status}]: ${error.response.statusText}`
+          )
+        );
+        console.error(
+          chalk.red(
+            `Response data: ${JSON.stringify(error.response.data, null, 2)}`
+          )
+        );
+        console.error(chalk.red(`Request URL: ${error.config?.url}`));
+      } else if (error.request) {
+        // Request was made but no response received
+        console.error(
+          chalk.red('Network Error: No response received from server')
+        );
+        console.error(chalk.red(`Request URL: ${error.config?.url}`));
+        console.error(chalk.red(`Request method: ${error.config?.method}`));
+      } else {
+        // Something else happened
+        console.error(chalk.red(`Request Error: ${error.message}`));
+      }
     } else if (error instanceof Error) {
-      console.error(chalk.red(error.message));
+      console.error(chalk.red(`Error: ${error.message}`));
+      console.error(chalk.red(`Stack trace: ${error.stack}`));
+    } else {
+      console.error(chalk.red(`Unknown esrror: ${String(error)}`));
     }
+
+    // Re-throw the error so it can be handled by the calling function
+    throw error;
   }
 }
 
@@ -159,6 +223,7 @@ function classifyFileType(filePath: string): string {
   if (normalizedPath.includes('/middleware/plugins')) return 'Middleware';
   if (normalizedPath.includes('/pages/api/')) return 'API Route';
   if (normalizedPath.includes('/page-props-factory/plugins/')) return 'Plugin';
+  if (normalizedPath.endsWith('/package.json')) return 'Package';
 
   return 'Module';
 }

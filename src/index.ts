@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+// Load environment variables from .env file
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { analyzeCodebase } from './analyser.js';
@@ -20,8 +24,21 @@ program
   )
   .argument('<path>', 'Path to the root of the JSS project')
   .action(async path => {
-    console.log(chalk.blue(`🚀 Starting analysis of codebase at: ${path}`));
-    await analyzeCodebase(path);
+    try {
+      console.log(chalk.blue(`🚀 Starting analysis of codebase at: ${path}`));
+      await analyzeCodebase(path);
+    } catch (error) {
+      console.error(chalk.red('\n❌ Analysis failed:'));
+      if (error instanceof Error) {
+        console.error(chalk.red(`Error: ${error.message}`));
+        if (process.env.NODE_ENV === 'development') {
+          console.error(chalk.red(`Stack trace: ${error.stack}`));
+        }
+      } else {
+        console.error(chalk.red(`Unknown error: ${String(error)}`));
+      }
+      process.exit(1);
+    }
   });
 
 program.parse();

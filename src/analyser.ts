@@ -113,7 +113,7 @@ export async function analyzeCodebase(
   const filteredFiles = relevantFiles.filter(file => {
     const relativePath = path.relative(projectPath, file);
     const fileType = classifyFileType(relativePath);
-    return ['Package'].includes(fileType);
+    return ['Plugin', 'Middleware', 'Package'].includes(fileType);
   });
 
   console.log(

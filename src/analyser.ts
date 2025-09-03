@@ -6,40 +6,54 @@ import chalk from 'chalk';
 import axios from 'axios';
 
 // --- Configuration ---
-// The URL for the deployed backend service. Use an environment variable for this.
-function getConfig() {
-  return {
-    SERVICE_HOST: process.env.SERVICE_HOST || 'http://localhost:7071',
-    INITIALISE_JOB_SERVICE_KEY: process.env.INITIALISE_JOB_SERVICE_KEY,
-    ANALYSE_FILE_SERVICE_KEY: process.env.ANALYSE_FILE_SERVICE_KEY,
-    FINALISE_JOB_SERVICE_KEY: process.env.FINALISE_JOB_SERVICE_KEY,
-  };
+interface ServiceConfig {
+  SERVICE_HOST: string;
+  SERVICE_KEY: string;
+  DEBUG: boolean;
+  VERBOSE: boolean;
+  WHAT_IF: boolean;
 }
 
-export async function analyzeCodebase(projectPath: string) {
-  // Get configuration (this ensures environment variables are loaded)
-  const config = getConfig();
+const getConfig = (
+  apiKey: string,
+  debug: boolean,
+  verbose: boolean,
+  whatIf: boolean,
+  serviceVersion: string
+): ServiceConfig => ({
+  SERVICE_HOST: debug
+    ? 'http://localhost:7071'
+    : `https://api-think-fresh-digital.azure-api.net/content-sdk/${serviceVersion}`,
+  SERVICE_KEY: apiKey,
+  DEBUG: debug,
+  VERBOSE: verbose,
+  WHAT_IF: whatIf,
+});
+
+const buildServiceUrl = (config: ServiceConfig, route: string): string => {
+  const base = config.SERVICE_HOST.endsWith('/')
+    ? config.SERVICE_HOST.slice(0, -1)
+    : config.SERVICE_HOST;
+  const cleanRoute = route.startsWith('/') ? route.slice(1) : route;
+  const path = config.DEBUG ? `/api/${cleanRoute}` : `/${cleanRoute}`;
+  const url = `${base}${path}`;
+  return config.DEBUG ? url : `${url}?code=${config.SERVICE_KEY}`;
+};
+
+export async function analyzeCodebase(
+  projectPath: string,
+  apiKey: string,
+  debug: boolean,
+  verbose: boolean,
+  whatIf: boolean,
+  serviceVersion: string
+) {
+  // Get configuration
+  const config = getConfig(apiKey, debug, verbose, whatIf, serviceVersion);
 
   // Check if the project path exists
   if (!fs.existsSync(projectPath)) {
     throw new Error(`Project path does not exist: ${projectPath}`);
-  }
-
-  // Check if SERVICE_HOST is not localhost and any service keys are missing
-  if (config.SERVICE_HOST !== 'http://localhost:7071') {
-    const missingKeys: string[] = [];
-    if (!config.INITIALISE_JOB_SERVICE_KEY)
-      missingKeys.push('INITIALISE_JOB_SERVICE_KEY');
-    if (!config.ANALYSE_FILE_SERVICE_KEY)
-      missingKeys.push('ANALYSE_FILE_SERVICE_KEY');
-    if (!config.FINALISE_JOB_SERVICE_KEY)
-      missingKeys.push('FINALISE_JOB_SERVICE_KEY');
-
-    if (missingKeys.length > 0) {
-      throw new Error(
-        `Service keys are required when not using localhost. Missing keys: ${missingKeys.join(', ')}`
-      );
-    }
   }
 
   // 1. Define file patterns and what to ignore
@@ -47,6 +61,7 @@ export async function analyzeCodebase(projectPath: string) {
   const globPattern = `**/*.{${targetExtensions.join(',')}}`;
   // Add specific pattern for package.json files
   const packageJsonPattern = '**/package.json';
+
   // 2. Load and parse the .gitignore file
   const ig = ignore();
   const gitignorePath = path.join(projectPath, '.gitignore');
@@ -72,18 +87,22 @@ export async function analyzeCodebase(projectPath: string) {
     'site-resolver',
     'extract-path',
   ]);
+
   // 3. Find all matching files using glob
   const sourceFiles = await glob(globPattern, {
     cwd: projectPath, // Search within the user's project directory
     absolute: true, // Get absolute paths for easier reading
     dot: true, // Include dotfiles if any (unlikely for src)
   });
+
   const packageJsonFiles = await glob(packageJsonPattern, {
     cwd: projectPath,
     absolute: true,
-    dot: true,
+    dot: false,
   });
+
   const allFiles = [...sourceFiles, ...packageJsonFiles];
+
   // 4. Filter out ignored files
   const relevantFiles = allFiles.filter(file => {
     const relativePath = path.relative(projectPath, file);
@@ -94,35 +113,41 @@ export async function analyzeCodebase(projectPath: string) {
   const filteredFiles = relevantFiles.filter(file => {
     const relativePath = path.relative(projectPath, file);
     const fileType = classifyFileType(relativePath);
-    return ['Plugin', 'Middleware', 'Package'].includes(fileType);
+    return ['Package'].includes(fileType);
   });
 
   console.log(
-    chalk.green(`✅ Found ${relevantFiles.length} relevant source files.`)
+    chalk.green(`Found ${relevantFiles.length} relevant source files.`)
   );
   console.log(
     chalk.blue(
-      `📁 Filtered to ${filteredFiles.length} files for analysis (Plugin, Middleware, Package only).`
+      `Filtered to ${filteredFiles.length} files for analysis (Plugin, Middleware, Package only).`
     )
   );
 
   // Next step: Read file contents and send for analysis
-  await readAndAnalyzeFiles(projectPath, filteredFiles);
+  await readAndAnalyzeFiles(projectPath, filteredFiles, config);
 }
 
 /**
  * Reads each file and sends it to the backend for analysis.
  */
-async function readAndAnalyzeFiles(projectPath: string, filePaths: string[]) {
-  // Get configuration (this ensures environment variables are loaded)
-  const config = getConfig();
-
+async function readAndAnalyzeFiles(
+  projectPath: string,
+  filePaths: string[],
+  config: ServiceConfig
+) {
   try {
     // 1. Start a new job to get a jobId
-    console.log(chalk.blue('🚀 Initializing new analysis job...'));
+    console.log(chalk.blue('Initializing new analysis job...'));
 
     const jobResponse = await axios.get(
-      `${config.SERVICE_HOST}/api/jobs-initiate?code=${config.INITIALISE_JOB_SERVICE_KEY}`
+      buildServiceUrl(config, 'jobs-initiate'),
+      {
+        headers: {
+          'Ocp-Apim-Subscription-Key': config.SERVICE_KEY,
+        },
+      }
     );
 
     const { jobId } = jobResponse.data;
@@ -132,7 +157,7 @@ async function readAndAnalyzeFiles(projectPath: string, filePaths: string[]) {
     // 2. Send all files for analysis concurrently
     console.log(
       chalk.blue(
-        `📡 Uploading ${filePaths.length} files for analysis (Plugin, Middleware, Package only)...`
+        `Uploading ${filePaths.length} files for analysis (Plugin, Middleware, Package only)...`
       )
     );
 
@@ -144,22 +169,33 @@ async function readAndAnalyzeFiles(projectPath: string, filePaths: string[]) {
       const payload = { filePath: relativePath, fileType, fileContents };
 
       return axios.post(
-        `${config.SERVICE_HOST}/api/jobs/${jobId}/analyse-file?code=${config.ANALYSE_FILE_SERVICE_KEY}`,
-        payload
+        buildServiceUrl(config, `jobs/${jobId}/analyse-file`),
+        payload,
+        {
+          headers: {
+            'Ocp-Apim-Subscription-Key': config.SERVICE_KEY,
+          },
+        }
       );
     });
 
     // Wait for all file uploads to complete
     await Promise.all(analysisPromises);
 
-    console.log(chalk.green('✅ All files analyzed successfully.'));
+    console.log(chalk.green('All files analyzed successfully.'));
 
     // 3. Finalize the job to get the report
-    console.log(chalk.blue('📝 Finalising job and generating report...'));
+    console.log(chalk.blue('Finalising job and generating report...'));
 
     // This will be updated when the finalise endpoint is implemented
     const finalizeResponse = await axios.post(
-      `${config.SERVICE_HOST}/api/jobs/${jobId}/finalise?code=${config.FINALISE_JOB_SERVICE_KEY}`
+      buildServiceUrl(config, `jobs/${jobId}/finalise`),
+      undefined,
+      {
+        headers: {
+          'Ocp-Apim-Subscription-Key': config.SERVICE_KEY,
+        },
+      }
     );
     const { reportUrl } = finalizeResponse.data;
 
@@ -171,7 +207,7 @@ async function readAndAnalyzeFiles(projectPath: string, filePaths: string[]) {
     console.log(chalk.underline.cyan(reportUrl));
   } catch (error) {
     console.error(
-      chalk.red('\n❌ An error occurred during the analysis process.')
+      chalk.red('\nAn error occurred during the analysis process.')
     );
 
     // Log detailed error information

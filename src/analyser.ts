@@ -4,41 +4,13 @@ import glob from 'fast-glob';
 import ignore from 'ignore';
 import chalk from 'chalk';
 import axios from 'axios';
-
-// --- Configuration ---
-interface ServiceConfig {
-  SERVICE_HOST: string;
-  SERVICE_KEY: string;
-  DEBUG: boolean;
-  VERBOSE: boolean;
-  WHAT_IF: boolean;
-}
-
-const getConfig = (
-  apiKey: string,
-  debug: boolean,
-  verbose: boolean,
-  whatIf: boolean,
-  serviceVersion: string
-): ServiceConfig => ({
-  SERVICE_HOST: debug
-    ? 'http://localhost:7071'
-    : `https://api-think-fresh-digital.azure-api.net/content-sdk/${serviceVersion}`,
-  SERVICE_KEY: apiKey,
-  DEBUG: debug,
-  VERBOSE: verbose,
-  WHAT_IF: whatIf,
-});
-
-const buildServiceUrl = (config: ServiceConfig, route: string): string => {
-  const base = config.SERVICE_HOST.endsWith('/')
-    ? config.SERVICE_HOST.slice(0, -1)
-    : config.SERVICE_HOST;
-  const cleanRoute = route.startsWith('/') ? route.slice(1) : route;
-  const path = config.DEBUG ? `/api/${cleanRoute}` : `/${cleanRoute}`;
-  const url = `${base}${path}`;
-  return config.DEBUG ? url : `${url}?code=${config.SERVICE_KEY}`;
-};
+import { setTimeout as delay } from 'timers/promises';
+import { classifyFileType } from './lib/classifyFileType.js';
+import { ServiceConfig } from './interfaces/configInterfaces';
+import { buildServiceUrl } from './lib/buildServiceUrl.js';
+import { getConfig } from './lib/getConfig.js';
+import PQueue from 'p-queue';
+import { DEFAULT_THROTTLE } from './lib/throttleDefaults.js';
 
 // Central list of file types to include in analysis and in log messages
 const FILE_TYPES_TO_ANALYZE: string[] = [
@@ -72,16 +44,108 @@ function emojiForFileType(fileType: string): string {
   }
 }
 
+function sleep(ms: number): Promise<void> {
+  return delay(ms).then(() => undefined);
+}
+
+function isTimeoutError(error: unknown): boolean {
+  return (
+    axios.isAxiosError(error) &&
+    (error.code === 'ECONNABORTED' ||
+      (typeof error.message === 'string' && error.message.includes('timeout')))
+  );
+}
+
+function getRetryAfterMs(error: unknown): number | undefined {
+  if (!axios.isAxiosError(error)) return undefined;
+  const header = error.response?.headers?.['retry-after'];
+  if (!header) return undefined;
+  const asNumber = Number(header);
+  if (!Number.isNaN(asNumber)) {
+    return asNumber * 1000;
+  }
+  const asDate = Date.parse(header);
+  if (!Number.isNaN(asDate)) {
+    const delta = asDate - Date.now();
+    return delta > 0 ? delta : 0;
+  }
+  return undefined;
+}
+
+async function withRetry<T>(
+  operation: () => Promise<T>,
+  options?: {
+    retries?: number;
+    minDelayMs?: number;
+    maxDelayMs?: number;
+    verbose?: boolean;
+  }
+): Promise<T> {
+  const retries = options?.retries ?? 3;
+  const minDelayMs = options?.minDelayMs ?? 1000;
+  const maxDelayMs = options?.maxDelayMs ?? 8000;
+  const verbose = options?.verbose ?? false;
+
+  for (let attempt = 1; attempt <= retries; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      const status = axios.isAxiosError(error)
+        ? error.response?.status
+        : undefined;
+      const retryableStatus =
+        status === 408 ||
+        status === 429 ||
+        (typeof status === 'number' && status >= 500);
+      const retryable = isTimeoutError(error) || retryableStatus;
+
+      if (attempt === retries || !retryable) {
+        throw error;
+      }
+
+      const headerDelay = getRetryAfterMs(error);
+      const expDelay = Math.min(maxDelayMs, minDelayMs * 2 ** (attempt - 1));
+      const jitter = Math.floor(Math.random() * 250);
+      const delayMs = headerDelay ?? expDelay + jitter;
+
+      const reason = status
+        ? `HTTP ${status}`
+        : isTimeoutError(error)
+          ? 'timeout'
+          : 'error';
+      if (verbose) {
+        console.log(
+          chalk.yellow(
+            `Retrying request (attempt ${attempt + 1}/${retries}) after ${delayMs}ms due to ${reason}`
+          )
+        );
+      }
+      await sleep(delayMs);
+    }
+  }
+
+  // Should never reach here
+  throw new Error('unreachable');
+}
+
 export async function analyzeCodebase(
   projectPath: string,
   apiKey: string,
   debug: boolean,
   verbose: boolean,
   whatIf: boolean,
-  serviceVersion: string
+  serviceVersion: string,
+  throttle?: { maxConcurrent: number; intervalCap: number; intervalMs: number }
 ) {
   // Get configuration
-  const config = getConfig(apiKey, debug, verbose, whatIf, serviceVersion);
+  const config = getConfig(
+    apiKey,
+    debug,
+    verbose,
+    whatIf,
+    serviceVersion,
+    throttle
+  );
 
   // Check if the project path exists
   if (!fs.existsSync(projectPath)) {
@@ -180,15 +244,14 @@ export async function analyzeCodebase(
   await readAndAnalyzeFiles(projectPath, filteredFiles, config);
 }
 
-/**
- * Reads each file and sends it to the backend for analysis.
- */
 async function readAndAnalyzeFiles(
   projectPath: string,
   filePaths: string[],
   config: ServiceConfig
 ) {
   try {
+    // Track analysis start time
+    const startTimeMs = Date.now();
     // 1. Start a new job to get a jobId
     console.log(chalk.blue('Initializing new analysis job...'));
 
@@ -205,12 +268,30 @@ async function readAndAnalyzeFiles(
 
     console.log(chalk.gray(`Job ID: ${jobId}`));
 
-    // 2. Send all files for analysis concurrently
+    // 2. Send files for analysis with throttling
     console.log(
       chalk.blue(
         `Uploading ${filePaths.length} files for analysis (${FILE_TYPES_TO_ANALYZE.join(', ')})...`
       )
     );
+
+    const totalFiles = filePaths.length;
+    let completedCount = 0;
+    const timedOutFiles: string[] = [];
+
+    const concurrency =
+      config.THROTTLE?.maxConcurrent ?? DEFAULT_THROTTLE.maxConcurrent;
+    const intervalCap =
+      config.THROTTLE?.intervalCap ?? DEFAULT_THROTTLE.intervalCap;
+    const interval = config.THROTTLE?.intervalMs ?? DEFAULT_THROTTLE.intervalMs;
+
+    const queue = new PQueue({
+      concurrency,
+      intervalCap,
+      interval,
+      carryoverConcurrencyCount: true,
+      autoStart: true,
+    });
 
     const analysisPromises = filePaths.map(async filePath => {
       const fileContents = fs.readFileSync(filePath, 'utf-8');
@@ -219,21 +300,62 @@ async function readAndAnalyzeFiles(
 
       const payload = { filePath: relativePath, fileType, fileContents };
 
-      return axios.post(
-        buildServiceUrl(config, `jobs/${jobId}/analyse-file`),
-        payload,
-        {
-          headers: {
-            'Ocp-Apim-Subscription-Key': config.SERVICE_KEY,
-          },
+      try {
+        await queue.add(() =>
+          withRetry(
+            () =>
+              axios.post(
+                buildServiceUrl(config, `jobs/${jobId}/analyse-file`),
+                payload,
+                {
+                  headers: {
+                    'Ocp-Apim-Subscription-Key': config.SERVICE_KEY,
+                  },
+                  timeout: DEFAULT_THROTTLE.timeoutMs,
+                }
+              ),
+            {
+              retries: 4,
+              minDelayMs: 1000,
+              maxDelayMs: 10000,
+              verbose: config.VERBOSE,
+            }
+          )
+        );
+
+        completedCount += 1;
+        const percent = Math.round((completedCount / totalFiles) * 100);
+        console.log(
+          chalk.gray(
+            `${completedCount} of ${totalFiles} files analysed (${percent}%)`
+          )
+        );
+      } catch (error: unknown) {
+        // Swallow only timeout errors (after retries) so other errors still fail the run
+        if (isTimeoutError(error)) {
+          timedOutFiles.push(relativePath);
+          return; // abandon this file without throwing
         }
-      );
+        throw error;
+      }
     });
 
-    // Wait for all file uploads to complete
+    // Wait for all file uploads to complete (timeouts are handled per promise)
     await Promise.all(analysisPromises);
+    await queue.onIdle();
 
-    console.log(chalk.green('All files analyzed successfully.'));
+    if (timedOutFiles.length > 0) {
+      console.log(
+        chalk.yellow(
+          `\nThe following ${timedOutFiles.length} file(s) timed out after ${Math.round(
+            DEFAULT_THROTTLE.timeoutMs / 1000
+          )}s and were not analysed:`
+        )
+      );
+      timedOutFiles.forEach(fp => console.log(chalk.yellow(` - ${fp}`)));
+    }
+
+    console.log(chalk.green('All non-timed-out files analyzed successfully.'));
 
     // 3. Finalize the job to get the report
     console.log(chalk.blue('Finalising job and generating report...'));
@@ -250,9 +372,12 @@ async function readAndAnalyzeFiles(
     );
     const { reportUrl } = finalizeResponse.data;
 
-    // 4. Display the final report URL
+    // 4. Display the final report URL with elapsed time in minutes
+    const elapsedMinutes = ((Date.now() - startTimeMs) / 60000).toFixed(2);
     console.log(
-      chalk.bold.green('\n🎉 Your migration analysis report is ready!')
+      chalk.bold.green(
+        `\n🎉 Your migration analysis report is ready! (took ${elapsedMinutes} minutes)`
+      )
     );
 
     console.log(chalk.underline.cyan(reportUrl));
@@ -297,38 +422,4 @@ async function readAndAnalyzeFiles(
     // Re-throw the error so it can be handled by the calling function
     throw error;
   }
-}
-
-/**
- * A simple classifier to determine the file's role based on its path.
- */
-function classifyFileType(filePath: string): string {
-  const normalizedPath = filePath.replace(/\\/g, '/').toLowerCase(); // Normalize for Windows paths and make case insensitive
-  if (
-    ['boostrap.tsx', 'layout.tsx', 'notfound.tsx', 'scripts.tsx'].some(suffix =>
-      normalizedPath.endsWith(suffix)
-    )
-  )
-    return 'Page';
-
-  if (
-    ['component-props/index.ts', 'next.config.js'].some(suffix =>
-      normalizedPath.endsWith(suffix)
-    )
-  )
-    return 'Config';
-
-  if (
-    normalizedPath.includes('/components/') &&
-    normalizedPath.endsWith('.tsx')
-  )
-    return 'Component';
-  if (normalizedPath.includes('/middleware/plugins')) return 'Middleware';
-  if (normalizedPath.includes('/pages/api/')) return 'API Route';
-  if (normalizedPath.includes('/pages/') && normalizedPath.endsWith('.tsx'))
-    return 'Page';
-  if (normalizedPath.includes('/page-props-factory/plugins/')) return 'Plugin';
-  if (normalizedPath.endsWith('/package.json')) return 'Package';
-
-  return 'Module';
 }

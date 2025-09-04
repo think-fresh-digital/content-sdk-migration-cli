@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { analyzeCodebase } from './analyser.js';
+import { DEFAULT_THROTTLE } from './lib/throttleDefaults.js';
 
 const program = new Command();
 
@@ -23,6 +24,24 @@ program
   .option('-d, --debug', 'Enable debug mode', false)
   .option('-v, --verbose', 'Enable verbose output', false)
   .option('--whatIf', 'Run without making changes (dry run mode)', false)
+  .option(
+    '--maxConcurrent <number>',
+    'Max in-flight requests',
+    (value: string) => parseInt(value, 10),
+    DEFAULT_THROTTLE.maxConcurrent
+  )
+  .option(
+    '--intervalCap <number>',
+    'Max requests per interval',
+    (value: string) => parseInt(value, 10),
+    DEFAULT_THROTTLE.intervalCap
+  )
+  .option(
+    '--intervalMs <number>',
+    'Interval window in ms',
+    (value: string) => parseInt(value, 10),
+    DEFAULT_THROTTLE.intervalMs
+  )
   .option(
     '--serviceVersion <version>',
     'Service version to use (defaults to v1)',
@@ -52,13 +71,45 @@ program
         chalk.blue(`Starting analysis of codebase at: ${options.path}`)
       );
 
+      const defaultMaxConcurrent = DEFAULT_THROTTLE.maxConcurrent;
+      const defaultIntervalCap = DEFAULT_THROTTLE.intervalCap;
+      const defaultIntervalMs = DEFAULT_THROTTLE.intervalMs;
+
+      // Warnings for unsafe overrides
+      if (options.maxConcurrent > defaultMaxConcurrent) {
+        console.warn(
+          chalk.bgYellow.black(
+            `WARNING: --maxConcurrent=${options.maxConcurrent} exceeds safe default (${defaultMaxConcurrent}). This can cause service timeouts.`
+          )
+        );
+      }
+      if (options.intervalMs < defaultIntervalMs) {
+        console.warn(
+          chalk.bgYellow.black(
+            `WARNING: --intervalMs=${options.intervalMs} is below safe default (${defaultIntervalMs}). This increases rate-limit risk.`
+          )
+        );
+      }
+      if (options.intervalCap > defaultIntervalCap) {
+        console.warn(
+          chalk.bgYellow.black(
+            `WARNING: --intervalCap=${options.intervalCap} exceeds safe default (${defaultIntervalCap}). This increases rate-limit risk.`
+          )
+        );
+      }
+
       await analyzeCodebase(
         options.path,
         options.apiKey,
         options.debug,
         options.verbose,
         options.whatIf,
-        options.serviceVersion
+        options.serviceVersion,
+        {
+          maxConcurrent: options.maxConcurrent,
+          intervalCap: options.intervalCap,
+          intervalMs: options.intervalMs,
+        }
       );
     } catch (error) {
       console.error(chalk.red('\nAnalysis failed:'));

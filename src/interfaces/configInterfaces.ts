@@ -4,4 +4,9 @@ export interface ServiceConfig {
   DEBUG: boolean;
   VERBOSE: boolean;
   WHAT_IF: boolean;
+  THROTTLE?: {
+    maxConcurrent: number;
+    intervalCap: number;
+    intervalMs: number;
+  };
 }

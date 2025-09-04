@@ -5,7 +5,8 @@ export const getConfig = (
   debug: boolean,
   verbose: boolean,
   whatIf: boolean,
-  serviceVersion: string
+  serviceVersion: string,
+  throttle?: { maxConcurrent: number; intervalCap: number; intervalMs: number }
 ): ServiceConfig => ({
   SERVICE_HOST: debug
     ? 'http://localhost:7071'
@@ -14,4 +15,5 @@ export const getConfig = (
   DEBUG: debug,
   VERBOSE: verbose,
   WHAT_IF: whatIf,
+  THROTTLE: throttle ?? undefined,
 });

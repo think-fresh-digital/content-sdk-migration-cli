@@ -9,6 +9,38 @@ import { ServiceConfig } from './interfaces/configInterfaces';
 import { buildServiceUrl } from './lib/buildServiceUrl.js';
 import { getConfig } from './lib/getConfig.js';
 
+// Central list of file types to include in analysis and in log messages
+const FILE_TYPES_TO_ANALYZE: string[] = [
+  'Plugin',
+  'Middleware',
+  'Package',
+  'Component',
+  'Page',
+  'API Route',
+  'Config',
+];
+
+function emojiForFileType(fileType: string): string {
+  switch (fileType) {
+    case 'Plugin':
+      return '🔌';
+    case 'Middleware':
+      return '🧰';
+    case 'Package':
+      return '📦';
+    case 'Component':
+      return '🧩';
+    case 'Page':
+      return '📄';
+    case 'API Route':
+      return '🔀';
+    case 'Config':
+      return '⚙️';
+    default:
+      return '📄';
+  }
+}
+
 export async function analyzeCodebase(
   projectPath: string,
   apiKey: string,
@@ -82,7 +114,7 @@ export async function analyzeCodebase(
   const filteredFiles = relevantFiles.filter(file => {
     const relativePath = path.relative(projectPath, file);
     const fileType = classifyFileType(relativePath);
-    return ['Plugin', 'Middleware', 'Package'].includes(fileType);
+    return FILE_TYPES_TO_ANALYZE.includes(fileType);
   });
 
   console.log(
@@ -90,11 +122,30 @@ export async function analyzeCodebase(
   );
   console.log(
     chalk.blue(
-      `Filtered to ${filteredFiles.length} files for analysis (Plugin, Middleware, Package only).`
+      `Filtered to ${filteredFiles.length} files for analysis (${FILE_TYPES_TO_ANALYZE.join(', ')}).`
     )
   );
 
+  if (config.VERBOSE) {
+    console.log(chalk.gray('Files queued for analysis:'));
+    filteredFiles.forEach(file => {
+      const relativePath = path.relative(projectPath, file);
+      const type = classifyFileType(relativePath);
+      const emoji = emojiForFileType(type);
+      console.log(`${emoji} ${relativePath}`);
+    });
+  }
+
   // Next step: Read file contents and send for analysis
+  if (config.WHAT_IF) {
+    console.log(
+      chalk.yellow(
+        'WHAT-IF mode enabled: Skipping backend analysis calls. No API requests will be made.'
+      )
+    );
+    return;
+  }
+
   await readAndAnalyzeFiles(projectPath, filteredFiles, config);
 }
 
@@ -125,7 +176,7 @@ async function readAndAnalyzeFiles(
     // 2. Send all files for analysis concurrently
     console.log(
       chalk.blue(
-        `Uploading ${filePaths.length} files for analysis (Plugin, Middleware, Package only)...`
+        `Uploading ${filePaths.length} files for analysis (${FILE_TYPES_TO_ANALYZE.join(', ')})...`
       )
     );
 

@@ -4,41 +4,10 @@ import glob from 'fast-glob';
 import ignore from 'ignore';
 import chalk from 'chalk';
 import axios from 'axios';
-
-// --- Configuration ---
-interface ServiceConfig {
-  SERVICE_HOST: string;
-  SERVICE_KEY: string;
-  DEBUG: boolean;
-  VERBOSE: boolean;
-  WHAT_IF: boolean;
-}
-
-const getConfig = (
-  apiKey: string,
-  debug: boolean,
-  verbose: boolean,
-  whatIf: boolean,
-  serviceVersion: string
-): ServiceConfig => ({
-  SERVICE_HOST: debug
-    ? 'http://localhost:7071'
-    : `https://api-think-fresh-digital.azure-api.net/content-sdk/${serviceVersion}`,
-  SERVICE_KEY: apiKey,
-  DEBUG: debug,
-  VERBOSE: verbose,
-  WHAT_IF: whatIf,
-});
-
-const buildServiceUrl = (config: ServiceConfig, route: string): string => {
-  const base = config.SERVICE_HOST.endsWith('/')
-    ? config.SERVICE_HOST.slice(0, -1)
-    : config.SERVICE_HOST;
-  const cleanRoute = route.startsWith('/') ? route.slice(1) : route;
-  const path = config.DEBUG ? `/api/${cleanRoute}` : `/${cleanRoute}`;
-  const url = `${base}${path}`;
-  return config.DEBUG ? url : `${url}?code=${config.SERVICE_KEY}`;
-};
+import { classifyFileType } from './lib/classifyFileType';
+import { ServiceConfig } from './interfaces/configInterfaces';
+import { buildServiceUrl } from './lib/buildServiceUrl';
+import { getConfig } from './lib/getConfig';
 
 export async function analyzeCodebase(
   projectPath: string,
@@ -129,9 +98,6 @@ export async function analyzeCodebase(
   await readAndAnalyzeFiles(projectPath, filteredFiles, config);
 }
 
-/**
- * Reads each file and sends it to the backend for analysis.
- */
 async function readAndAnalyzeFiles(
   projectPath: string,
   filePaths: string[],
@@ -246,19 +212,4 @@ async function readAndAnalyzeFiles(
     // Re-throw the error so it can be handled by the calling function
     throw error;
   }
-}
-
-/**
- * A simple classifier to determine the file's role based on its path.
- */
-function classifyFileType(filePath: string): string {
-  const normalizedPath = filePath.replace(/\\/g, '/').toLowerCase(); // Normalize for Windows paths and make case insensitive
-
-  if (normalizedPath.includes('/components/')) return 'Component';
-  if (normalizedPath.includes('/middleware/plugins')) return 'Middleware';
-  if (normalizedPath.includes('/pages/api/')) return 'API Route';
-  if (normalizedPath.includes('/page-props-factory/plugins/')) return 'Plugin';
-  if (normalizedPath.endsWith('/package.json')) return 'Package';
-
-  return 'Module';
 }

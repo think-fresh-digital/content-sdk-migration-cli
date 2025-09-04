@@ -40,6 +40,38 @@ const buildServiceUrl = (config: ServiceConfig, route: string): string => {
   return config.DEBUG ? url : `${url}?code=${config.SERVICE_KEY}`;
 };
 
+// Central list of file types to include in analysis and in log messages
+const FILE_TYPES_TO_ANALYZE: string[] = [
+  'Plugin',
+  'Middleware',
+  'Package',
+  'Component',
+  'Page',
+  'API Route',
+  'Config',
+];
+
+function emojiForFileType(fileType: string): string {
+  switch (fileType) {
+    case 'Plugin':
+      return '🔌';
+    case 'Middleware':
+      return '🧰';
+    case 'Package':
+      return '📦';
+    case 'Component':
+      return '🧩';
+    case 'Page':
+      return '📄';
+    case 'API Route':
+      return '🔀';
+    case 'Config':
+      return '⚙️';
+    default:
+      return '📄';
+  }
+}
+
 export async function analyzeCodebase(
   projectPath: string,
   apiKey: string,
@@ -113,7 +145,7 @@ export async function analyzeCodebase(
   const filteredFiles = relevantFiles.filter(file => {
     const relativePath = path.relative(projectPath, file);
     const fileType = classifyFileType(relativePath);
-    return ['Plugin', 'Middleware', 'Package'].includes(fileType);
+    return FILE_TYPES_TO_ANALYZE.includes(fileType);
   });
 
   console.log(
@@ -121,11 +153,30 @@ export async function analyzeCodebase(
   );
   console.log(
     chalk.blue(
-      `Filtered to ${filteredFiles.length} files for analysis (Plugin, Middleware, Package only).`
+      `Filtered to ${filteredFiles.length} files for analysis (${FILE_TYPES_TO_ANALYZE.join(', ')}).`
     )
   );
 
+  if (config.VERBOSE) {
+    console.log(chalk.gray('Files queued for analysis:'));
+    filteredFiles.forEach(file => {
+      const relativePath = path.relative(projectPath, file);
+      const type = classifyFileType(relativePath);
+      const emoji = emojiForFileType(type);
+      console.log(`${emoji} ${relativePath}`);
+    });
+  }
+
   // Next step: Read file contents and send for analysis
+  if (config.WHAT_IF) {
+    console.log(
+      chalk.yellow(
+        'WHAT-IF mode enabled: Skipping backend analysis calls. No API requests will be made.'
+      )
+    );
+    return;
+  }
+
   await readAndAnalyzeFiles(projectPath, filteredFiles, config);
 }
 
@@ -157,7 +208,7 @@ async function readAndAnalyzeFiles(
     // 2. Send all files for analysis concurrently
     console.log(
       chalk.blue(
-        `Uploading ${filePaths.length} files for analysis (Plugin, Middleware, Package only)...`
+        `Uploading ${filePaths.length} files for analysis (${FILE_TYPES_TO_ANALYZE.join(', ')})...`
       )
     );
 
@@ -253,10 +304,29 @@ async function readAndAnalyzeFiles(
  */
 function classifyFileType(filePath: string): string {
   const normalizedPath = filePath.replace(/\\/g, '/').toLowerCase(); // Normalize for Windows paths and make case insensitive
+  if (
+    ['boostrap.tsx', 'layout.tsx', 'notfound.tsx', 'scripts.tsx'].some(suffix =>
+      normalizedPath.endsWith(suffix)
+    )
+  )
+    return 'Page';
 
-  if (normalizedPath.includes('/components/')) return 'Component';
+  if (
+    ['component-props/index.ts', 'next.config.js'].some(suffix =>
+      normalizedPath.endsWith(suffix)
+    )
+  )
+    return 'Config';
+
+  if (
+    normalizedPath.includes('/components/') &&
+    normalizedPath.endsWith('.tsx')
+  )
+    return 'Component';
   if (normalizedPath.includes('/middleware/plugins')) return 'Middleware';
   if (normalizedPath.includes('/pages/api/')) return 'API Route';
+  if (normalizedPath.includes('/pages/') && normalizedPath.endsWith('.tsx'))
+    return 'Page';
   if (normalizedPath.includes('/page-props-factory/plugins/')) return 'Plugin';
   if (normalizedPath.endsWith('/package.json')) return 'Package';
 

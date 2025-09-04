@@ -4,10 +4,10 @@ import glob from 'fast-glob';
 import ignore from 'ignore';
 import chalk from 'chalk';
 import axios from 'axios';
-import { classifyFileType } from './lib/classifyFileType';
+import { classifyFileType } from './lib/classifyFileType.js';
 import { ServiceConfig } from './interfaces/configInterfaces';
-import { buildServiceUrl } from './lib/buildServiceUrl';
-import { getConfig } from './lib/getConfig';
+import { buildServiceUrl } from './lib/buildServiceUrl.js';
+import { getConfig } from './lib/getConfig.js';
 
 export async function analyzeCodebase(
   projectPath: string,
@@ -104,6 +104,8 @@ async function readAndAnalyzeFiles(
   config: ServiceConfig
 ) {
   try {
+    // Track analysis start time
+    const startTimeMs = Date.now();
     // 1. Start a new job to get a jobId
     console.log(chalk.blue('Initializing new analysis job...'));
 
@@ -127,6 +129,9 @@ async function readAndAnalyzeFiles(
       )
     );
 
+    const totalFiles = filePaths.length;
+    let completedCount = 0;
+
     const analysisPromises = filePaths.map(async filePath => {
       const fileContents = fs.readFileSync(filePath, 'utf-8');
       const relativePath = path.relative(projectPath, filePath);
@@ -134,15 +139,21 @@ async function readAndAnalyzeFiles(
 
       const payload = { filePath: relativePath, fileType, fileContents };
 
-      return axios.post(
-        buildServiceUrl(config, `jobs/${jobId}/analyse-file`),
-        payload,
-        {
+      return axios
+        .post(buildServiceUrl(config, `jobs/${jobId}/analyse-file`), payload, {
           headers: {
             'Ocp-Apim-Subscription-Key': config.SERVICE_KEY,
           },
-        }
-      );
+        })
+        .then(() => {
+          completedCount += 1;
+          const percent = Math.round((completedCount / totalFiles) * 100);
+          console.log(
+            chalk.gray(
+              `${completedCount} of ${totalFiles} files analysed (${percent}%)`
+            )
+          );
+        });
     });
 
     // Wait for all file uploads to complete
@@ -165,9 +176,12 @@ async function readAndAnalyzeFiles(
     );
     const { reportUrl } = finalizeResponse.data;
 
-    // 4. Display the final report URL
+    // 4. Display the final report URL with elapsed time in minutes
+    const elapsedMinutes = ((Date.now() - startTimeMs) / 60000).toFixed(2);
     console.log(
-      chalk.bold.green('\n🎉 Your migration analysis report is ready!')
+      chalk.bold.green(
+        `\n🎉 Your migration analysis report is ready! (took ${elapsedMinutes} minutes)`
+      )
     );
 
     console.log(chalk.underline.cyan(reportUrl));

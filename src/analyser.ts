@@ -370,7 +370,7 @@ async function readAndAnalyzeFiles(
         },
       }
     );
-    const { reportUrl } = finalizeResponse.data;
+    const { reportUrl, pdfUrl, llmPromptUrl } = finalizeResponse.data;
 
     // 4. Display the final report URL with elapsed time in minutes
     const elapsedMinutes = ((Date.now() - startTimeMs) / 60000).toFixed(2);
@@ -379,8 +379,12 @@ async function readAndAnalyzeFiles(
         `\n🎉 Your migration analysis report is ready! (took ${elapsedMinutes} minutes)`
       )
     );
-
+    console.log(chalk.bold.green('PDF URL:'));
+    console.log(chalk.underline.cyan(pdfUrl));
+    console.log(chalk.bold.green('Markdown URL:'));
     console.log(chalk.underline.cyan(reportUrl));
+    console.log(chalk.bold.green('LLM Prompt URL:'));
+    console.log(chalk.underline.cyan(llmPromptUrl));
   } catch (error) {
     console.error(
       chalk.red('\nAn error occurred during the analysis process.')

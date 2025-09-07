@@ -4,32 +4,72 @@ categories:
     labels:
       - 'feature'
       - 'enhancement'
-    # Or match the commit prefix
-    autolabeler:
-      - label: 'feature'
-        branch:
-          - '/^feat(:.*)?\/.+/'
   - title: '🐛 Bug Fixes'
     labels:
       - 'fix'
       - 'bug'
-    autolabeler:
-      - label: 'fix'
-        branch:
-          - '/^fix(:.*)?\/.+/'
   - title: '📖 Documentation'
     labels:
       - 'docs'
-    autolabeler:
-      - label: 'docs'
-        branch:
-          - '/^docs(:.*)?\/.+/'
+  - title: '🧰 Chores'
+    labels:
+      - 'chore'
+  - title: '🔧 Refactoring'
+    labels:
+      - 'refactor'
+  - title: '⚡ Performance'
+    labels:
+      - 'perf'
+  - title: '🧪 Tests'
+    labels:
+      - 'test'
+  - title: '⚙️ CI'
+    labels:
+      - 'ci'
+  - title: '🏗️ Build'
+    labels:
+      - 'build'
 
 # Template for the release notes.
 template: |
   ## What's Changed
 
   $CHANGES
+
+# Auto-apply labels based on Conventional Commits in PR titles/bodies
+autolabeler:
+  - label: 'feature'
+    title:
+      - '/^feat(\(.+\))?!?:/i'
+  - label: 'fix'
+    title:
+      - '/^fix(\(.+\))?!?:/i'
+  - label: 'docs'
+    title:
+      - '/^docs(\(.+\))?!?:/i'
+  - label: 'chore'
+    title:
+      - '/^chore(\(.+\))?!?:/i'
+  - label: 'refactor'
+    title:
+      - '/^refactor(\(.+\))?!?:/i'
+  - label: 'perf'
+    title:
+      - '/^perf(\(.+\))?!?:/i'
+  - label: 'test'
+    title:
+      - '/^test(\(.+\))?!?:/i'
+  - label: 'ci'
+    title:
+      - '/^ci(\(.+\))?!?:/i'
+  - label: 'build'
+    title:
+      - '/^build(\(.+\))?!?:/i'
+  - label: 'breaking-change'
+    title:
+      - '/^.+!:/'
+    body:
+      - '/BREAKING CHANGE:/i'
 
 # Automatically suggest the next version number based on the types of changes.
 version-resolver:

@@ -1,0 +1,46 @@
+# Categorize pull requests based on their labels or commit prefixes.
+categories:
+  - title: '✨ Features'
+    labels:
+      - 'feature'
+      - 'enhancement'
+    # Or match the commit prefix
+    autolabeler:
+      - label: 'feature'
+        branch:
+          - '/^feat(:.*)?\/.+/'
+  - title: '🐛 Bug Fixes'
+    labels:
+      - 'fix'
+      - 'bug'
+    autolabeler:
+      - label: 'fix'
+        branch:
+          - '/^fix(:.*)?\/.+/'
+  - title: '📖 Documentation'
+    labels:
+      - 'docs'
+    autolabeler:
+      - label: 'docs'
+        branch:
+          - '/^docs(:.*)?\/.+/'
+
+# Template for the release notes.
+template: |
+  ## What's Changed
+
+  $CHANGES
+
+# Automatically suggest the next version number based on the types of changes.
+version-resolver:
+  major:
+    labels:
+      - 'breaking-change'
+  minor:
+    labels:
+      - 'feature'
+  patch:
+    labels:
+      - 'fix'
+      - 'bug'
+  default: patch

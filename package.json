@@ -1,9 +1,12 @@
 {
-  "name": "content-sdk-migration-cli",
+  "name": "@think-fresh-digital/content-sdk-migrate",
   "version": "0.1.0",
   "bin": {
-    "content-sdk-migration": "./dist/index.js"
+    "content-sdk-migrate": "dist/index.js"
   },
+  "files": [
+    "dist"
+  ],
   "type": "module",
   "description": "AI-powered CLI to accelerate the migration of Sitecore JSS Next.js apps to the Content SDK.",
   "main": "index.js",
@@ -21,7 +24,14 @@
     "type": "git",
     "url": "git+https://github.com/think-fresh-digital/content-sdk-migration-cli.git"
   },
-  "keywords": [],
+  "keywords": [
+    "sitecore",
+    "jss",
+    "next.js",
+    "content-sdk",
+    "migration",
+    "cli"
+  ],
   "author": "Think Fresh Digital",
   "license": "MIT",
   "bugs": {

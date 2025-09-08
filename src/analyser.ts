@@ -182,6 +182,14 @@ export async function analyzeCodebase(
     'sitemap-fetcher',
     'site-resolver',
     'extract-path',
+    '__tests__',
+    '__mocks__',
+    '__fixtures__',
+    '__stories__',
+    '__test-utils__',
+    '__test-helpers__',
+    '__test-utils__',
+    '__data__',
   ]);
 
   // 3. Find all matching files using glob

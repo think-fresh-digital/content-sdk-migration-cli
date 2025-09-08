@@ -1,6 +1,6 @@
 {
   "name": "@think-fresh-digital/content-sdk-migrate",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "bin": {
     "content-sdk-migrate": "dist/index.js"
   },

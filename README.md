@@ -58,6 +58,7 @@ content-sdk-migrate report \
 ### Options
 
 - `-p, --path <path>`: Path to the root of the JSS project (required)
+- `--gitignore <path>`: Path to a `.gitignore` file to use for file discovery
 - `--apiKey <key>`: API key for authentication (required unless `--debug`)
 - `-d, --debug`: Use local debug service (`http://localhost:7071`)
 - `-v, --verbose`: Verbose logging
@@ -68,6 +69,32 @@ content-sdk-migrate report \
 - `--intervalMs <number>`: Interval window in milliseconds (default safe value is used)
 
 Note: The CLI warns when throttle overrides are potentially unsafe.
+
+### How the .gitignore is used
+
+During file discovery, the CLI respects ignore rules to avoid scanning dependencies, build outputs, and other non-source files.
+
+- By default, it looks for a `.gitignore` at the project root specified by `--path` and applies its rules.
+- You can provide a different ignore file using `--gitignore <path>`. The path can be absolute or relative to the `--path` directory.
+- If the provided path does not exist, a warning is shown and the CLI falls back to built-in defaults only.
+
+Examples:
+
+```bash
+# Use the project's root .gitignore (default behavior)
+content-sdk-migrate report --path . --apiKey <api-key>
+
+# Use a custom ignore file located elsewhere
+content-sdk-migrate report --path . --apiKey <api-key> --gitignore ./configs/migrate.ignore
+
+# Provide an absolute path to the ignore file
+content-sdk-migrate report --path . --apiKey <api-key> --gitignore C:/work/myapp/.gitignore
+```
+
+Notes:
+
+- The CLI also applies a small set of sensible default ignores as a fallback (e.g., `node_modules`, build outputs, and common test fixture folders like `__tests__`).
+- The ignore rules are applied to the relative paths of discovered files using standard `.gitignore` semantics.
 
 ### Passing the API key via environment variables
 

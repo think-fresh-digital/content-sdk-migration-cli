@@ -135,7 +135,8 @@ export async function analyzeCodebase(
   verbose: boolean,
   whatIf: boolean,
   serviceVersion: string,
-  throttle?: { maxConcurrent: number; intervalCap: number; intervalMs: number }
+  throttle?: { maxConcurrent: number; intervalCap: number; intervalMs: number },
+  gitignorePathOverride?: string
 ) {
   // Get configuration
   const config = getConfig(
@@ -160,14 +161,41 @@ export async function analyzeCodebase(
 
   // 2. Load and parse the .gitignore file
   const ig = ignore();
-  const gitignorePath = path.join(projectPath, '.gitignore');
-  if (fs.existsSync(gitignorePath)) {
-    ig.add(fs.readFileSync(gitignorePath).toString());
+  // Determine which .gitignore to use: user-specified or project default
+  const candidatePaths: string[] = [];
+  if (gitignorePathOverride) {
+    const absoluteOverride = path.isAbsolute(gitignorePathOverride)
+      ? gitignorePathOverride
+      : path.join(projectPath, gitignorePathOverride);
+    candidatePaths.push(absoluteOverride);
+  }
+  candidatePaths.push(path.join(projectPath, '.gitignore'));
+
+  let loadedGitignorePath: string | undefined;
+  for (const candidate of candidatePaths) {
+    if (fs.existsSync(candidate)) {
+      ig.add(fs.readFileSync(candidate, 'utf-8'));
+      loadedGitignorePath = candidate;
+      break;
+    }
+  }
+
+  if (gitignorePathOverride && !loadedGitignorePath) {
+    console.warn(
+      chalk.bgYellow.black(
+        `WARNING: --gitignore provided but not found: ${gitignorePathOverride}. Proceeding without it.`
+      )
+    );
+  } else if (loadedGitignorePath && verbose) {
+    console.log(chalk.gray(`Using .gitignore from: ${loadedGitignorePath}`));
   }
   // Add default ignores as a fallback
   ig.add([
     'node_modules',
     '.next',
+    '.turbo',
+    '.swc',
+    '.sonarlint',
     'dist',
     'build',
     'local-containers',
@@ -210,7 +238,9 @@ export async function analyzeCodebase(
   // 4. Filter out ignored files
   const relevantFiles = allFiles.filter(file => {
     const relativePath = path.relative(projectPath, file);
-    return !ig.ignores(relativePath);
+    // Normalize to POSIX for ignore lib matching (handles Windows paths)
+    const posixRelative = relativePath.split(path.sep).join('/');
+    return !ig.ignores(posixRelative);
   });
 
   // 5. Filter files to only include Plugin, Middleware, or Package types

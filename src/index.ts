@@ -20,6 +20,7 @@ program
     'Analyse a local codebase and generate a Content SDK migration report'
   )
   .option('-p, --path <path>', 'Path to the root of the JSS project')
+  .option('--gitignore <path>', 'Path to a .gitignore file to apply')
   .option('--apiKey <key>', 'API key for authentication', '')
   .option('-d, --debug', 'Enable debug mode', false)
   .option('-v, --verbose', 'Enable verbose output', false)
@@ -109,7 +110,8 @@ program
           maxConcurrent: options.maxConcurrent,
           intervalCap: options.intervalCap,
           intervalMs: options.intervalMs,
-        }
+        },
+        options.gitignore
       );
     } catch (error) {
       console.error(chalk.red('\nAnalysis failed:'));

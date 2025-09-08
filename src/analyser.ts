@@ -23,6 +23,9 @@ const FILE_TYPES_TO_ANALYZE: string[] = [
   'Config',
 ];
 
+// Allow a longer timeout for the finalise request, which can take a while server-side
+const FINALISE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+
 function emojiForFileType(fileType: string): string {
   switch (fileType) {
     case 'Plugin':
@@ -406,6 +409,8 @@ async function readAndAnalyzeFiles(
         headers: {
           'Ocp-Apim-Subscription-Key': config.SERVICE_KEY,
         },
+        // Long-running operation: increase timeout and do not wrap in retry logic
+        timeout: FINALISE_TIMEOUT_MS,
       }
     );
     const { reportUrl, pdfUrl, llmPromptUrl } = finalizeResponse.data;

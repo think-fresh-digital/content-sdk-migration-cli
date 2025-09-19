@@ -141,6 +141,14 @@ export async function analyzeCodebase(
   throttle?: { maxConcurrent: number; intervalCap: number; intervalMs: number },
   gitignorePathOverride?: string
 ) {
+  // Display CLI version
+  console.log(chalk.blue('Content SDK Migration CLI v0.1.4-beta.1'));
+  console.log(
+    chalk.gray(
+      'AI-powered CLI to accelerate the migration of Sitecore JSS Next.js apps to the Content SDK\n'
+    )
+  );
+
   // Get configuration
   const config = getConfig(
     apiKey,
@@ -221,6 +229,7 @@ export async function analyzeCodebase(
     '__test-helpers__',
     '__test-utils__',
     '__data__',
+    '*.stories.tsx',
   ]);
 
   // 3. Find all matching files using glob
@@ -319,6 +328,7 @@ async function readAndAnalyzeFiles(
     const totalFiles = filePaths.length;
     let completedCount = 0;
     const timedOutFiles: string[] = [];
+    const failedFiles: Array<{ filePath: string; error: string }> = [];
 
     const concurrency =
       config.THROTTLE?.maxConcurrent ?? DEFAULT_THROTTLE.maxConcurrent;
@@ -372,12 +382,33 @@ async function readAndAnalyzeFiles(
           )
         );
       } catch (error: unknown) {
-        // Swallow only timeout errors (after retries) so other errors still fail the run
+        // Handle different types of errors
         if (isTimeoutError(error)) {
           timedOutFiles.push(relativePath);
           return; // abandon this file without throwing
         }
-        throw error;
+
+        // For server errors, collect them but don't fail the entire process
+        let errorMessage = 'Unknown error';
+        if (axios.isAxiosError(error)) {
+          if (error.response) {
+            errorMessage = `HTTP ${error.response.status}: ${error.response.statusText}`;
+            if (error.response.data) {
+              errorMessage += ` - ${JSON.stringify(error.response.data)}`;
+            }
+          } else if (error.request) {
+            errorMessage = 'Network error: No response received from server';
+          } else {
+            errorMessage = `Request error: ${error.message}`;
+          }
+        } else if (error instanceof Error) {
+          errorMessage = error.message;
+        } else {
+          errorMessage = String(error);
+        }
+
+        failedFiles.push({ filePath: relativePath, error: errorMessage });
+        return; // abandon this file without throwing
       }
     });
 
@@ -396,7 +427,24 @@ async function readAndAnalyzeFiles(
       timedOutFiles.forEach(fp => console.log(chalk.yellow(` - ${fp}`)));
     }
 
-    console.log(chalk.green('All non-timed-out files analyzed successfully.'));
+    if (failedFiles.length > 0) {
+      console.log(
+        chalk.red(
+          `\nThe following ${failedFiles.length} file(s) failed during analysis:`
+        )
+      );
+      failedFiles.forEach(({ filePath, error }) =>
+        console.log(chalk.red(` - ${filePath}: ${error}`))
+      );
+    }
+
+    const successfulFiles =
+      totalFiles - timedOutFiles.length - failedFiles.length;
+    console.log(
+      chalk.green(
+        `${successfulFiles} of ${totalFiles} files analyzed successfully.`
+      )
+    );
 
     // 3. Finalize the job to get the report
     console.log(chalk.blue('Finalising job and generating report...'));

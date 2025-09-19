@@ -142,7 +142,7 @@ export async function analyzeCodebase(
   gitignorePathOverride?: string
 ) {
   // Display CLI version
-  console.log(chalk.blue('Content SDK Migration CLI v0.1.4-beta.1'));
+  console.log(chalk.blue('Content SDK Migration CLI v0.1.4-beta.2'));
   console.log(
     chalk.gray(
       'AI-powered CLI to accelerate the migration of Sitecore JSS Next.js apps to the Content SDK\n'

@@ -12,7 +12,7 @@ program
   .description(
     'AI-powered CLI to accelerate the migration of Sitecore JSS Next.js apps to the Content SDK'
   )
-  .version('0.1.0');
+  .version('0.1.4-beta.1');
 
 program
   .command('report')

@@ -53,6 +53,9 @@ content-sdk-migrate report \
   --maxConcurrent 8 \
   --intervalCap 16 \
   --intervalMs 1000
+
+# Specify model type for analysis
+content-sdk-migrate report --path . --apiKey <api-key> --modelType claude
 ```
 
 ### Options
@@ -64,6 +67,7 @@ content-sdk-migrate report \
 - `-v, --verbose`: Verbose logging
 - `--whatIf`: Skip backend calls; discover and list files only
 - `--serviceVersion <version>`: Service version to use (default: `v1`)
+- `--modelType <type>`: Model type to use for analysis: `deepseek`, `claude`, or `gpt` (default: `deepseek`)
 - `--maxConcurrent <number>`: Max in-flight requests (default safe value is used)
 - `--intervalCap <number>`: Max requests per interval window (default safe value is used)
 - `--intervalMs <number>`: Interval window in milliseconds (default safe value is used)

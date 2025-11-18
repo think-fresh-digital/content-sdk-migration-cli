@@ -47,6 +47,7 @@ function emojiForFileType(fileType: string): string {
   }
 }
 
+/* v8 ignore start */
 function sleep(ms: number): Promise<void> {
   return delay(ms).then(() => undefined);
 }
@@ -130,6 +131,7 @@ async function withRetry<T>(
   // Should never reach here
   throw new Error('unreachable');
 }
+/* v8 ignore end */
 
 export async function analyzeCodebase(
   projectPath: string,

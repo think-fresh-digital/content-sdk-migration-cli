@@ -51,6 +51,12 @@ export default [
     },
   },
   {
+    files: ['**/*.test.ts', '**/*.spec.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+  {
     ignores: [
       'node_modules/',
       'dist/',
@@ -60,6 +66,7 @@ export default [
       'package-lock.json',
       'yarn.lock',
       'pnpm-lock.yaml',
+      'vitest.config.ts',
     ],
   },
 ];

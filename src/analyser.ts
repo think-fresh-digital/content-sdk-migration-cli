@@ -141,7 +141,8 @@ export async function analyzeCodebase(
   whatIf: boolean,
   serviceVersion: string,
   throttle?: { maxConcurrent: number; intervalCap: number; intervalMs: number },
-  gitignorePathOverride?: string
+  gitignorePathOverride?: string,
+  modelType: 'deepseek' | 'claude' | 'gpt' = 'deepseek'
 ) {
   // Display CLI version
   console.log(chalk.blue('Content SDK Migration CLI v0.1.4-beta.2'));
@@ -293,13 +294,14 @@ export async function analyzeCodebase(
     return;
   }
 
-  await readAndAnalyzeFiles(projectPath, filteredFiles, config);
+  await readAndAnalyzeFiles(projectPath, filteredFiles, config, modelType);
 }
 
 async function readAndAnalyzeFiles(
   projectPath: string,
   filePaths: string[],
-  config: ServiceConfig
+  config: ServiceConfig,
+  modelType: 'deepseek' | 'claude' | 'gpt'
 ) {
   try {
     // Track analysis start time
@@ -307,8 +309,9 @@ async function readAndAnalyzeFiles(
     // 1. Start a new job to get a jobId
     console.log(chalk.blue('Initializing new analysis job...'));
 
-    const jobResponse = await axios.get(
+    const jobResponse = await axios.post(
       buildServiceUrl(config, 'jobs-initiate'),
+      { modelType },
       {
         headers: {
           'Ocp-Apim-Subscription-Key': config.SERVICE_KEY,

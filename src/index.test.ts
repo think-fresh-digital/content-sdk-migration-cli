@@ -71,6 +71,7 @@ describe('CLI Entry Point', () => {
         intervalCap: DEFAULT_THROTTLE.intervalCap,
         intervalMs: DEFAULT_THROTTLE.intervalMs,
         serviceVersion: 'v1',
+        modelType: 'gpt',
       });
 
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -98,6 +99,7 @@ describe('CLI Entry Point', () => {
         intervalCap: DEFAULT_THROTTLE.intervalCap,
         intervalMs: DEFAULT_THROTTLE.intervalMs,
         serviceVersion: 'v1',
+        modelType: 'gpt',
       });
 
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -121,6 +123,7 @@ describe('CLI Entry Point', () => {
         intervalCap: DEFAULT_THROTTLE.intervalCap,
         intervalMs: DEFAULT_THROTTLE.intervalMs,
         serviceVersion: 'v1',
+        modelType: 'gpt',
       });
 
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -138,7 +141,8 @@ describe('CLI Entry Point', () => {
           intervalCap: DEFAULT_THROTTLE.intervalCap,
           intervalMs: DEFAULT_THROTTLE.intervalMs,
         }),
-        undefined
+        undefined,
+        'gpt'
       );
 
       consoleSpy.mockRestore();
@@ -163,6 +167,7 @@ describe('CLI Entry Point', () => {
         intervalCap: DEFAULT_THROTTLE.intervalCap,
         intervalMs: DEFAULT_THROTTLE.intervalMs,
         serviceVersion: 'v1',
+        modelType: 'gpt',
       });
 
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -192,6 +197,7 @@ describe('CLI Entry Point', () => {
         intervalCap: DEFAULT_THROTTLE.intervalCap,
         intervalMs: unsafeValue,
         serviceVersion: 'v1',
+        modelType: 'gpt',
       });
 
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -221,6 +227,7 @@ describe('CLI Entry Point', () => {
         intervalCap: unsafeValue,
         intervalMs: DEFAULT_THROTTLE.intervalMs,
         serviceVersion: 'v1',
+        modelType: 'gpt',
       });
 
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -248,6 +255,7 @@ describe('CLI Entry Point', () => {
         intervalCap: DEFAULT_THROTTLE.intervalCap,
         intervalMs: DEFAULT_THROTTLE.intervalMs,
         serviceVersion: 'v2',
+        modelType: 'gpt',
       });
 
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -265,7 +273,8 @@ describe('CLI Entry Point', () => {
           intervalCap: DEFAULT_THROTTLE.intervalCap,
           intervalMs: DEFAULT_THROTTLE.intervalMs,
         }),
-        undefined // gitignore
+        undefined, // gitignore
+        'gpt' // modelType
       );
 
       consoleSpy.mockRestore();
@@ -284,6 +293,7 @@ describe('CLI Entry Point', () => {
         intervalCap: 8,
         intervalMs: 1000,
         serviceVersion: 'v1',
+        modelType: 'gpt',
       });
 
       expect(analyzeCodebase).toHaveBeenCalledWith(
@@ -298,7 +308,8 @@ describe('CLI Entry Point', () => {
           intervalCap: 8,
           intervalMs: 1000,
         },
-        undefined
+        undefined,
+        'gpt'
       );
 
       consoleSpy.mockRestore();
@@ -318,6 +329,7 @@ describe('CLI Entry Point', () => {
         intervalMs: DEFAULT_THROTTLE.intervalMs,
         serviceVersion: 'v1',
         gitignore: '/custom/.gitignore',
+        modelType: 'gpt',
       });
 
       expect(analyzeCodebase).toHaveBeenCalledWith(
@@ -328,7 +340,8 @@ describe('CLI Entry Point', () => {
         false,
         'v1',
         expect.any(Object),
-        '/custom/.gitignore'
+        '/custom/.gitignore',
+        'gpt'
       );
 
       consoleSpy.mockRestore();
@@ -356,6 +369,7 @@ describe('CLI Entry Point', () => {
         intervalCap: DEFAULT_THROTTLE.intervalCap,
         intervalMs: DEFAULT_THROTTLE.intervalMs,
         serviceVersion: 'v1',
+        modelType: 'gpt',
       });
 
       expect(consoleSpy).toHaveBeenCalledWith('\nAnalysis failed:');

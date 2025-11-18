@@ -26,6 +26,7 @@ export async function handleReportCommand(options: {
   intervalCap: number;
   intervalMs: number;
   serviceVersion: string;
+  modelType: 'deepseek' | 'claude' | 'gpt';
 }) {
   try {
     if (!options.path) {
@@ -41,6 +42,17 @@ export async function handleReportCommand(options: {
       console.error(
         chalk.red(
           'API key is required. Use --apiKey <key> to specify the API key. Or use --debug to run in debug mode.'
+        )
+      );
+      process.exit(1);
+    }
+
+    // Validate modelType
+    const validModelTypes = ['deepseek', 'claude', 'gpt'];
+    if (!validModelTypes.includes(options.modelType)) {
+      console.error(
+        chalk.red(
+          `Invalid modelType: ${options.modelType}. Must be one of: ${validModelTypes.join(', ')}`
         )
       );
       process.exit(1);
@@ -89,7 +101,8 @@ export async function handleReportCommand(options: {
         intervalCap: options.intervalCap,
         intervalMs: options.intervalMs,
       },
-      options.gitignore
+      options.gitignore,
+      options.modelType as 'deepseek' | 'claude' | 'gpt'
     );
   } catch (error) {
     console.error(chalk.red('\nAnalysis failed:'));
@@ -138,6 +151,11 @@ program
     '--serviceVersion <version>',
     'Service version to use (defaults to v1)',
     'v1'
+  )
+  .option(
+    '--modelType <type>',
+    'Model type to use: deepseek, claude, or gpt (defaults to deepseek)',
+    'deepseek'
   )
   .action(handleReportCommand);
 

@@ -54,7 +54,17 @@ describe('analyzeCodebase', () => {
       vi.mocked(fs.existsSync).mockReturnValue(false);
 
       await expect(
-        analyzeCodebase(mockProjectPath, mockApiKey, false, false, false, 'v1')
+        analyzeCodebase(
+          mockProjectPath,
+          mockApiKey,
+          false,
+          false,
+          false,
+          'v1',
+          undefined,
+          undefined,
+          'gpt'
+        )
       ).rejects.toThrow('Project path does not exist');
     });
   });
@@ -76,7 +86,7 @@ describe('analyzeCodebase', () => {
       vi.mocked(classifyFileType).mockReturnValue('Component');
 
       // Mock axios for job initiation
-      vi.mocked(axios.get).mockResolvedValue({
+      vi.mocked(axios.post).mockResolvedValue({
         data: { jobId: 'test-job-id' },
       } as any);
 
@@ -101,7 +111,10 @@ describe('analyzeCodebase', () => {
         false,
         false,
         false,
-        'v1'
+        'v1',
+        undefined,
+        undefined,
+        'gpt'
       );
 
       expect(glob).toHaveBeenCalledWith(
@@ -125,7 +138,7 @@ describe('analyzeCodebase', () => {
 
       vi.mocked(classifyFileType).mockReturnValue('Package');
 
-      vi.mocked(axios.get).mockResolvedValue({
+      vi.mocked(axios.post).mockResolvedValue({
         data: { jobId: 'test-job-id' },
       } as any);
 
@@ -149,7 +162,10 @@ describe('analyzeCodebase', () => {
         false,
         false,
         false,
-        'v1'
+        'v1',
+        undefined,
+        undefined,
+        'gpt'
       );
 
       expect(glob).toHaveBeenCalledWith(
@@ -192,7 +208,7 @@ describe('analyzeCodebase', () => {
 
       vi.mocked(classifyFileType).mockReturnValue('Component');
 
-      vi.mocked(axios.get).mockResolvedValue({
+      vi.mocked(axios.post).mockResolvedValue({
         data: { jobId: 'test-job-id' },
       } as any);
 
@@ -216,7 +232,10 @@ describe('analyzeCodebase', () => {
         false,
         false,
         false,
-        'v1'
+        'v1',
+        undefined,
+        undefined,
+        'gpt'
       );
 
       // Check that readFileSync was called with the gitignore path (handle both Unix and Windows paths)
@@ -248,7 +267,7 @@ describe('analyzeCodebase', () => {
 
       vi.mocked(classifyFileType).mockReturnValue('Component');
 
-      vi.mocked(axios.get).mockResolvedValue({
+      vi.mocked(axios.post).mockResolvedValue({
         data: { jobId: 'test-job-id' },
       } as any);
 
@@ -274,7 +293,8 @@ describe('analyzeCodebase', () => {
         false,
         'v1',
         undefined,
-        '/custom/.gitignore'
+        '/custom/.gitignore',
+        'gpt'
       );
 
       expect(fs.readFileSync).toHaveBeenCalledWith(
@@ -298,7 +318,7 @@ describe('analyzeCodebase', () => {
 
       vi.mocked(classifyFileType).mockReturnValue('Component');
 
-      vi.mocked(axios.get).mockResolvedValue({
+      vi.mocked(axios.post).mockResolvedValue({
         data: { jobId: 'test-job-id' },
       } as any);
 
@@ -326,7 +346,8 @@ describe('analyzeCodebase', () => {
         false,
         'v1',
         undefined,
-        '/nonexistent/.gitignore'
+        '/nonexistent/.gitignore',
+        'gpt'
       );
 
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -358,7 +379,7 @@ describe('analyzeCodebase', () => {
         return 'Module';
       });
 
-      vi.mocked(axios.get).mockResolvedValue({
+      vi.mocked(axios.post).mockResolvedValue({
         data: { jobId: 'test-job-id' },
       } as any);
 
@@ -382,7 +403,10 @@ describe('analyzeCodebase', () => {
         false,
         false,
         false,
-        'v1'
+        'v1',
+        undefined,
+        undefined,
+        'gpt'
       );
 
       // Should filter out 'Module' type files
@@ -411,7 +435,10 @@ describe('analyzeCodebase', () => {
         false,
         false,
         true,
-        'v1'
+        'v1',
+        undefined,
+        undefined,
+        'gpt'
       );
 
       expect(axios.get).not.toHaveBeenCalled();
@@ -440,7 +467,7 @@ describe('analyzeCodebase', () => {
       const verboseConfig = { ...mockConfig, VERBOSE: true };
       vi.mocked(getConfig).mockReturnValue(verboseConfig);
 
-      vi.mocked(axios.get).mockResolvedValue({
+      vi.mocked(axios.post).mockResolvedValue({
         data: { jobId: 'test-job-id' },
       } as any);
 
@@ -466,7 +493,10 @@ describe('analyzeCodebase', () => {
         false,
         true,
         false,
-        'v1'
+        'v1',
+        undefined,
+        undefined,
+        'gpt'
       );
 
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -493,7 +523,7 @@ describe('analyzeCodebase', () => {
         'http://localhost:7071/api/jobs-initiate'
       );
 
-      vi.mocked(axios.get).mockResolvedValue({
+      vi.mocked(axios.post).mockResolvedValue({
         data: { jobId: 'test-job-id' },
       } as any);
 
@@ -517,11 +547,15 @@ describe('analyzeCodebase', () => {
         false,
         false,
         false,
-        'v1'
+        'v1',
+        undefined,
+        undefined,
+        'gpt'
       );
 
-      expect(axios.get).toHaveBeenCalledWith(
+      expect(axios.post).toHaveBeenCalledWith(
         expect.any(String),
+        { modelType: 'gpt' },
         expect.objectContaining({
           headers: {
             'Ocp-Apim-Subscription-Key': mockApiKey,
@@ -549,7 +583,7 @@ describe('analyzeCodebase', () => {
         return 'http://localhost:7071/api/jobs-initiate';
       });
 
-      vi.mocked(axios.get).mockResolvedValue({
+      vi.mocked(axios.post).mockResolvedValue({
         data: { jobId: 'test-job-id' },
       } as any);
 
@@ -575,7 +609,10 @@ describe('analyzeCodebase', () => {
         false,
         false,
         false,
-        'v1'
+        'v1',
+        undefined,
+        undefined,
+        'gpt'
       );
 
       expect(axios.post).toHaveBeenCalledWith(

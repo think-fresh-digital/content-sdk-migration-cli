@@ -66,6 +66,9 @@ content-sdk-migrate report --path . --apiKey <api-key> --modelType claude
 - `-d, --debug`: Use local debug service (`http://localhost:7071`)
 - `-v, --verbose`: Verbose logging
 - `--whatIf`: Skip backend calls; discover and list files only
+- `--product <product>`: Migration product. Must be one of: `jss-to-jss`, `jss-to-content-sdk`, or `content-sdk-to-content-sdk`. If omitted in an interactive TTY session, you will be prompted to choose.
+- `--fromVersion <version>`: Source version for the selected product (for example `22.5`, `22.8`, `1.3.1`). Allowed values depend on `--product`; if omitted in an interactive TTY session, you will be prompted to choose a valid value.
+- `--toVersion <version>`: Target version for the selected product and `--fromVersion` (for example `22.6`, `1.4.1`, `1.5.0`). The CLI enforces only valid combinations; if omitted in an interactive TTY session, you will be prompted to choose a compatible target.
 - `--serviceVersion <version>`: Service version to use (default: `v1`)
 - `--modelType <type>`: Model type to use for analysis: `deepseek`, `claude`, or `gpt` (default: `deepseek`)
 - `--maxConcurrent <number>`: Max in-flight requests (default safe value is used)

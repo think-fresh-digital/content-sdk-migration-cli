@@ -52,6 +52,7 @@
     "commander": "^14.0.0",
     "fast-glob": "^3.3.3",
     "ignore": "^7.0.5",
+    "inquirer": "^13.3.0",
     "p-queue": "^8.0.1"
   },
   "devDependencies": {

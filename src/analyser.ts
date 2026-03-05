@@ -9,6 +9,11 @@ import { classifyFileType } from './lib/classifyFileType.js';
 import { ServiceConfig } from './interfaces/configInterfaces';
 import { buildServiceUrl } from './lib/buildServiceUrl.js';
 import { getConfig } from './lib/getConfig.js';
+import { Product } from './interfaces/migrationInterfaces.js';
+import {
+  JobInitiateRequest,
+  JobInitiateResponse,
+} from './interfaces/jobInterfaces.js';
 import PQueue from 'p-queue';
 import { DEFAULT_THROTTLE } from './lib/throttleDefaults.js';
 
@@ -140,6 +145,9 @@ export async function analyzeCodebase(
   verbose: boolean,
   whatIf: boolean,
   serviceVersion: string,
+  product: Product,
+  fromVersion: string,
+  toVersion: string,
   throttle?: { maxConcurrent: number; intervalCap: number; intervalMs: number },
   gitignorePathOverride?: string,
   modelType: 'deepseek' | 'claude' | 'gpt' = 'deepseek'
@@ -294,14 +302,25 @@ export async function analyzeCodebase(
     return;
   }
 
-  await readAndAnalyzeFiles(projectPath, filteredFiles, config, modelType);
+  await readAndAnalyzeFiles(
+    projectPath,
+    filteredFiles,
+    config,
+    modelType,
+    product,
+    fromVersion,
+    toVersion
+  );
 }
 
 async function readAndAnalyzeFiles(
   projectPath: string,
   filePaths: string[],
   config: ServiceConfig,
-  modelType: 'deepseek' | 'claude' | 'gpt'
+  modelType: 'deepseek' | 'claude' | 'gpt',
+  product: Product,
+  fromVersion: string,
+  toVersion: string
 ) {
   try {
     // Track analysis start time
@@ -309,9 +328,16 @@ async function readAndAnalyzeFiles(
     // 1. Start a new job to get a jobId
     console.log(chalk.blue('Initializing new analysis job...'));
 
-    const jobResponse = await axios.post(
+    const jobRequest: JobInitiateRequest = {
+      modelType,
+      product,
+      fromVersion,
+      toVersion,
+    };
+
+    const jobResponse = await axios.post<JobInitiateResponse>(
       buildServiceUrl(config, 'jobs-initiate'),
-      { modelType },
+      jobRequest,
       {
         headers: {
           'Ocp-Apim-Subscription-Key': config.SERVICE_KEY,

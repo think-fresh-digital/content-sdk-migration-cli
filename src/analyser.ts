@@ -47,6 +47,7 @@ function emojiForFileType(fileType: string): string {
   }
 }
 
+/* v8 ignore start */
 function sleep(ms: number): Promise<void> {
   return delay(ms).then(() => undefined);
 }
@@ -130,6 +131,7 @@ async function withRetry<T>(
   // Should never reach here
   throw new Error('unreachable');
 }
+/* v8 ignore end */
 
 export async function analyzeCodebase(
   projectPath: string,
@@ -139,10 +141,11 @@ export async function analyzeCodebase(
   whatIf: boolean,
   serviceVersion: string,
   throttle?: { maxConcurrent: number; intervalCap: number; intervalMs: number },
-  gitignorePathOverride?: string
+  gitignorePathOverride?: string,
+  modelType: 'deepseek' | 'claude' | 'gpt' = 'deepseek'
 ) {
   // Display CLI version
-  console.log(chalk.blue('Content SDK Migration CLI v0.1.4-beta.2'));
+  console.log(chalk.blue('Content SDK Migration CLI v0.2.0-beta.1'));
   console.log(
     chalk.gray(
       'AI-powered CLI to accelerate the migration of Sitecore JSS Next.js apps to the Content SDK\n'
@@ -291,13 +294,14 @@ export async function analyzeCodebase(
     return;
   }
 
-  await readAndAnalyzeFiles(projectPath, filteredFiles, config);
+  await readAndAnalyzeFiles(projectPath, filteredFiles, config, modelType);
 }
 
 async function readAndAnalyzeFiles(
   projectPath: string,
   filePaths: string[],
-  config: ServiceConfig
+  config: ServiceConfig,
+  modelType: 'deepseek' | 'claude' | 'gpt'
 ) {
   try {
     // Track analysis start time
@@ -305,8 +309,9 @@ async function readAndAnalyzeFiles(
     // 1. Start a new job to get a jobId
     console.log(chalk.blue('Initializing new analysis job...'));
 
-    const jobResponse = await axios.get(
+    const jobResponse = await axios.post(
       buildServiceUrl(config, 'jobs-initiate'),
+      { modelType },
       {
         headers: {
           'Ocp-Apim-Subscription-Key': config.SERVICE_KEY,

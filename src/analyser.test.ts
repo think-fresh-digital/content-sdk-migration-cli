@@ -63,7 +63,10 @@ describe('analyzeCodebase', () => {
           'v1',
           undefined,
           undefined,
-          'gpt'
+          'gpt',
+          'jss-to-jss',
+          '22.5',
+          '22.6'
         )
       ).rejects.toThrow('Project path does not exist');
     });
@@ -112,6 +115,9 @@ describe('analyzeCodebase', () => {
         false,
         false,
         'v1',
+        'jss-to-jss',
+        '22.5',
+        '22.6',
         undefined,
         undefined,
         'gpt'
@@ -163,6 +169,9 @@ describe('analyzeCodebase', () => {
         false,
         false,
         'v1',
+        'jss-to-jss',
+        '22.5',
+        '22.6',
         undefined,
         undefined,
         'gpt'
@@ -292,6 +301,9 @@ describe('analyzeCodebase', () => {
         false,
         false,
         'v1',
+        'jss-to-jss',
+        '22.5',
+        '22.6',
         undefined,
         '/custom/.gitignore',
         'gpt'
@@ -345,6 +357,9 @@ describe('analyzeCodebase', () => {
         false,
         false,
         'v1',
+        'jss-to-jss',
+        '22.5',
+        '22.6',
         undefined,
         '/nonexistent/.gitignore',
         'gpt'
@@ -404,6 +419,9 @@ describe('analyzeCodebase', () => {
         false,
         false,
         'v1',
+        'jss-to-jss',
+        '22.5',
+        '22.6',
         undefined,
         undefined,
         'gpt'
@@ -436,6 +454,9 @@ describe('analyzeCodebase', () => {
         false,
         true,
         'v1',
+        'jss-to-jss',
+        '22.5',
+        '22.6',
         undefined,
         undefined,
         'gpt'
@@ -496,7 +517,10 @@ describe('analyzeCodebase', () => {
         'v1',
         undefined,
         undefined,
-        'gpt'
+        'gpt',
+        'jss-to-jss',
+        '22.5',
+        '22.6'
       );
 
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -548,6 +572,9 @@ describe('analyzeCodebase', () => {
         false,
         false,
         'v1',
+        'jss-to-jss',
+        '22.5',
+        '22.6',
         undefined,
         undefined,
         'gpt'
@@ -555,7 +582,12 @@ describe('analyzeCodebase', () => {
 
       expect(axios.post).toHaveBeenCalledWith(
         expect.any(String),
-        { modelType: 'gpt' },
+        expect.objectContaining({
+          modelType: 'gpt',
+          product: 'jss-to-jss',
+          fromVersion: '22.5',
+          toVersion: '22.6',
+        }),
         expect.objectContaining({
           headers: {
             'Ocp-Apim-Subscription-Key': mockApiKey,

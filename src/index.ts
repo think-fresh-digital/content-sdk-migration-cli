@@ -4,6 +4,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { analyzeCodebase } from './analyser.js';
 import { DEFAULT_THROTTLE } from './lib/throttleDefaults.js';
+import { resolveMigrationSelection } from './lib/promptMigrationOptions.js';
 
 const program = new Command();
 
@@ -27,6 +28,9 @@ export async function handleReportCommand(options: {
   intervalMs: number;
   serviceVersion: string;
   modelType: 'deepseek' | 'claude' | 'gpt';
+  product?: string;
+  fromVersion?: string;
+  toVersion?: string;
 }) {
   try {
     if (!options.path) {
@@ -62,6 +66,12 @@ export async function handleReportCommand(options: {
       chalk.blue(`Starting analysis of codebase at: ${options.path}`)
     );
 
+    const migrationSelection = await resolveMigrationSelection({
+      product: options.product,
+      fromVersion: options.fromVersion,
+      toVersion: options.toVersion,
+    });
+
     const defaultMaxConcurrent = DEFAULT_THROTTLE.maxConcurrent;
     const defaultIntervalCap = DEFAULT_THROTTLE.intervalCap;
     const defaultIntervalMs = DEFAULT_THROTTLE.intervalMs;
@@ -96,6 +106,9 @@ export async function handleReportCommand(options: {
       options.verbose,
       options.whatIf,
       options.serviceVersion,
+      migrationSelection.product,
+      migrationSelection.fromVersion,
+      migrationSelection.toVersion,
       {
         maxConcurrent: options.maxConcurrent,
         intervalCap: options.intervalCap,
@@ -129,6 +142,18 @@ program
   .option('-d, --debug', 'Enable debug mode', false)
   .option('-v, --verbose', 'Enable verbose output', false)
   .option('--whatIf', 'Run without making changes (dry run mode)', false)
+  .option(
+    '--product <product>',
+    'Migration product: jss-to-jss | jss-to-content-sdk | content-sdk-to-content-sdk'
+  )
+  .option(
+    '--fromVersion <version>',
+    'Source version for selected product (e.g. 22.5, 22.8, 1.3.1)'
+  )
+  .option(
+    '--toVersion <version>',
+    'Target version for selected product and fromVersion (e.g. 22.6, 1.4.1)'
+  )
   .option(
     '--maxConcurrent <number>',
     'Max in-flight requests',

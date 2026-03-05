@@ -7,6 +7,19 @@ vi.mock('./analyser.js', () => ({
   analyzeCodebase: vi.fn(),
 }));
 
+// Mock migration selection resolver to avoid interactive prompts
+const mockMigrationSelection = {
+  product: 'jss-to-jss',
+  fromVersion: '22.5',
+  toVersion: '22.6',
+};
+
+vi.mock('./lib/promptMigrationOptions.js', () => ({
+  resolveMigrationSelection: vi.fn(() =>
+    Promise.resolve(mockMigrationSelection)
+  ),
+}));
+
 // Mock chalk to avoid color output in tests
 vi.mock('chalk', () => ({
   default: {
@@ -136,6 +149,9 @@ describe('CLI Entry Point', () => {
         false, // verbose
         false, // whatIf
         'v1',
+        mockMigrationSelection.product,
+        mockMigrationSelection.fromVersion,
+        mockMigrationSelection.toVersion,
         expect.objectContaining({
           maxConcurrent: DEFAULT_THROTTLE.maxConcurrent,
           intervalCap: DEFAULT_THROTTLE.intervalCap,
@@ -268,6 +284,9 @@ describe('CLI Entry Point', () => {
         true, // verbose
         false, // whatIf
         'v2', // serviceVersion
+        mockMigrationSelection.product,
+        mockMigrationSelection.fromVersion,
+        mockMigrationSelection.toVersion,
         expect.objectContaining({
           maxConcurrent: DEFAULT_THROTTLE.maxConcurrent,
           intervalCap: DEFAULT_THROTTLE.intervalCap,
@@ -303,6 +322,9 @@ describe('CLI Entry Point', () => {
         false,
         false,
         'v1',
+        mockMigrationSelection.product,
+        mockMigrationSelection.fromVersion,
+        mockMigrationSelection.toVersion,
         {
           maxConcurrent: 4,
           intervalCap: 8,
@@ -339,6 +361,9 @@ describe('CLI Entry Point', () => {
         false,
         false,
         'v1',
+        mockMigrationSelection.product,
+        mockMigrationSelection.fromVersion,
+        mockMigrationSelection.toVersion,
         expect.any(Object),
         '/custom/.gitignore',
         'gpt'

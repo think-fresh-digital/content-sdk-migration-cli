@@ -10,9 +10,9 @@ const program = new Command();
 program
   .name('content-sdk-migration-cli')
   .description(
-    'AI-powered CLI to accelerate the migration of Sitecore JSS Next.js apps to the Content SDK'
+    'AI-powered CLI to accelerate the migration of Sitecore JSS Next.js apps to the SitecoreAI Content SDK'
   )
-  .version('0.1.4-beta.2');
+  .version('0.2.0-beta.1');
 
 // Export the handler function for testing
 export async function handleReportCommand(options: {

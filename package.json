@@ -8,14 +8,14 @@
     "dist"
   ],
   "type": "module",
-  "description": "AI-powered CLI to accelerate the migration of Sitecore JSS Next.js apps to the Content SDK.",
+  "description": "AI-powered CLI to accelerate the migration of Sitecore JSS Next.js apps to the SitecoreAI Content SDK.",
   "main": "index.js",
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "format": "prettier --write .",

@@ -12,7 +12,6 @@ describe('getConfig', () => {
         DEBUG: true,
         VERBOSE: false,
         WHAT_IF: false,
-        THROTTLE: undefined,
       });
     });
 
@@ -42,7 +41,6 @@ describe('getConfig', () => {
         DEBUG: false,
         VERBOSE: false,
         WHAT_IF: false,
-        THROTTLE: undefined,
       });
     });
 
@@ -66,42 +64,6 @@ describe('getConfig', () => {
 
       expect(config.WHAT_IF).toBe(true);
       expect(config.DEBUG).toBe(false);
-    });
-  });
-
-  describe('Throttle options', () => {
-    it('should merge throttle options when provided', () => {
-      const throttle = {
-        maxConcurrent: 5,
-        intervalCap: 10,
-        intervalMs: 1000,
-      };
-
-      const config = getConfig('key', false, false, false, 'v1', throttle);
-
-      expect(config.THROTTLE).toEqual(throttle);
-    });
-
-    it('should set THROTTLE to undefined when not provided', () => {
-      const config = getConfig('key', false, false, false, 'v1');
-
-      expect(config.THROTTLE).toBeUndefined();
-    });
-
-    it('should handle custom throttle values', () => {
-      const throttle = {
-        maxConcurrent: 8,
-        intervalCap: 16,
-        intervalMs: 500,
-      };
-
-      const config = getConfig('key', false, false, false, 'v1', throttle);
-
-      expect(config.THROTTLE).toEqual({
-        maxConcurrent: 8,
-        intervalCap: 16,
-        intervalMs: 500,
-      });
     });
   });
 

@@ -3,7 +3,6 @@ import fs from 'fs';
 import glob from 'fast-glob';
 import ignoreLib from 'ignore';
 import axios from 'axios';
-import PQueue from 'p-queue';
 import { getConfig } from './lib/getConfig.js';
 import { buildServiceUrl } from './lib/buildServiceUrl.js';
 import { classifyFileType } from './lib/classifyFileType.js';
@@ -13,10 +12,14 @@ vi.mock('fs');
 vi.mock('fast-glob');
 vi.mock('ignore');
 vi.mock('axios');
-vi.mock('p-queue');
 vi.mock('./lib/getConfig.js');
 vi.mock('./lib/buildServiceUrl.js');
 vi.mock('./lib/classifyFileType.js');
+
+// Make sleep() resolve immediately so polling tests don't block
+vi.mock('timers/promises', () => ({
+  setTimeout: () => Promise.resolve(),
+}));
 
 // Import after mocks
 import { analyzeCodebase } from './analyser.js';
@@ -30,7 +33,6 @@ describe('analyzeCodebase', () => {
     DEBUG: true,
     VERBOSE: false,
     WHAT_IF: false,
-    THROTTLE: undefined,
   };
 
   beforeEach(() => {
@@ -61,9 +63,6 @@ describe('analyzeCodebase', () => {
           false,
           false,
           'v1',
-          undefined,
-          undefined,
-          'gpt',
           'jss-to-jss',
           '22.5',
           '22.6'
@@ -88,25 +87,15 @@ describe('analyzeCodebase', () => {
 
       vi.mocked(classifyFileType).mockReturnValue('Component');
 
-      // Mock axios for job initiation
       vi.mocked(axios.post).mockResolvedValue({
         data: { jobId: 'test-job-id' },
+        status: 202,
       } as any);
 
-      vi.mocked(axios.post).mockResolvedValue({
-        data: {
-          reportUrl: 'http://example.com/report',
-          pdfUrl: 'http://example.com/report.pdf',
-          llmPromptUrl: 'http://example.com/prompt',
-        },
+      vi.mocked(axios.get).mockResolvedValue({
+        data: { percentComplete: 100, readyToFinalise: true },
+        status: 200,
       } as any);
-
-      // Mock PQueue
-      const mockQueue = {
-        add: vi.fn().mockResolvedValue(undefined),
-        onIdle: vi.fn().mockResolvedValue(undefined),
-      };
-      vi.mocked(PQueue).mockImplementation(() => mockQueue as any);
 
       await analyzeCodebase(
         mockProjectPath,
@@ -118,7 +107,6 @@ describe('analyzeCodebase', () => {
         'jss-to-jss',
         '22.5',
         '22.6',
-        undefined,
         undefined,
         'gpt'
       );
@@ -146,21 +134,13 @@ describe('analyzeCodebase', () => {
 
       vi.mocked(axios.post).mockResolvedValue({
         data: { jobId: 'test-job-id' },
+        status: 202,
       } as any);
 
-      vi.mocked(axios.post).mockResolvedValue({
-        data: {
-          reportUrl: 'http://example.com/report',
-          pdfUrl: 'http://example.com/report.pdf',
-          llmPromptUrl: 'http://example.com/prompt',
-        },
+      vi.mocked(axios.get).mockResolvedValue({
+        data: { percentComplete: 100, readyToFinalise: true },
+        status: 200,
       } as any);
-
-      const mockQueue = {
-        add: vi.fn().mockResolvedValue(undefined),
-        onIdle: vi.fn().mockResolvedValue(undefined),
-      };
-      vi.mocked(PQueue).mockImplementation(() => mockQueue as any);
 
       await analyzeCodebase(
         mockProjectPath,
@@ -172,7 +152,6 @@ describe('analyzeCodebase', () => {
         'jss-to-jss',
         '22.5',
         '22.6',
-        undefined,
         undefined,
         'gpt'
       );
@@ -219,21 +198,13 @@ describe('analyzeCodebase', () => {
 
       vi.mocked(axios.post).mockResolvedValue({
         data: { jobId: 'test-job-id' },
+        status: 202,
       } as any);
 
-      vi.mocked(axios.post).mockResolvedValue({
-        data: {
-          reportUrl: 'http://example.com/report',
-          pdfUrl: 'http://example.com/report.pdf',
-          llmPromptUrl: 'http://example.com/prompt',
-        },
+      vi.mocked(axios.get).mockResolvedValue({
+        data: { percentComplete: 100, readyToFinalise: true },
+        status: 200,
       } as any);
-
-      const mockQueue = {
-        add: vi.fn().mockResolvedValue(undefined),
-        onIdle: vi.fn().mockResolvedValue(undefined),
-      };
-      vi.mocked(PQueue).mockImplementation(() => mockQueue as any);
 
       await analyzeCodebase(
         mockProjectPath,
@@ -242,9 +213,9 @@ describe('analyzeCodebase', () => {
         false,
         false,
         'v1',
-        undefined,
-        undefined,
-        'gpt'
+        'jss-to-jss',
+        '22.5',
+        '22.6'
       );
 
       // Check that readFileSync was called with the gitignore path (handle both Unix and Windows paths)
@@ -278,21 +249,13 @@ describe('analyzeCodebase', () => {
 
       vi.mocked(axios.post).mockResolvedValue({
         data: { jobId: 'test-job-id' },
+        status: 202,
       } as any);
 
-      vi.mocked(axios.post).mockResolvedValue({
-        data: {
-          reportUrl: 'http://example.com/report',
-          pdfUrl: 'http://example.com/report.pdf',
-          llmPromptUrl: 'http://example.com/prompt',
-        },
+      vi.mocked(axios.get).mockResolvedValue({
+        data: { percentComplete: 100, readyToFinalise: true },
+        status: 200,
       } as any);
-
-      const mockQueue = {
-        add: vi.fn().mockResolvedValue(undefined),
-        onIdle: vi.fn().mockResolvedValue(undefined),
-      };
-      vi.mocked(PQueue).mockImplementation(() => mockQueue as any);
 
       await analyzeCodebase(
         mockProjectPath,
@@ -304,7 +267,6 @@ describe('analyzeCodebase', () => {
         'jss-to-jss',
         '22.5',
         '22.6',
-        undefined,
         '/custom/.gitignore',
         'gpt'
       );
@@ -332,21 +294,13 @@ describe('analyzeCodebase', () => {
 
       vi.mocked(axios.post).mockResolvedValue({
         data: { jobId: 'test-job-id' },
+        status: 202,
       } as any);
 
-      vi.mocked(axios.post).mockResolvedValue({
-        data: {
-          reportUrl: 'http://example.com/report',
-          pdfUrl: 'http://example.com/report.pdf',
-          llmPromptUrl: 'http://example.com/prompt',
-        },
+      vi.mocked(axios.get).mockResolvedValue({
+        data: { percentComplete: 100, readyToFinalise: true },
+        status: 200,
       } as any);
-
-      const mockQueue = {
-        add: vi.fn().mockResolvedValue(undefined),
-        onIdle: vi.fn().mockResolvedValue(undefined),
-      };
-      vi.mocked(PQueue).mockImplementation(() => mockQueue as any);
 
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -360,7 +314,6 @@ describe('analyzeCodebase', () => {
         'jss-to-jss',
         '22.5',
         '22.6',
-        undefined,
         '/nonexistent/.gitignore',
         'gpt'
       );
@@ -396,21 +349,13 @@ describe('analyzeCodebase', () => {
 
       vi.mocked(axios.post).mockResolvedValue({
         data: { jobId: 'test-job-id' },
+        status: 202,
       } as any);
 
-      vi.mocked(axios.post).mockResolvedValue({
-        data: {
-          reportUrl: 'http://example.com/report',
-          pdfUrl: 'http://example.com/report.pdf',
-          llmPromptUrl: 'http://example.com/prompt',
-        },
+      vi.mocked(axios.get).mockResolvedValue({
+        data: { percentComplete: 100, readyToFinalise: true },
+        status: 200,
       } as any);
-
-      const mockQueue = {
-        add: vi.fn().mockResolvedValue(undefined),
-        onIdle: vi.fn().mockResolvedValue(undefined),
-      };
-      vi.mocked(PQueue).mockImplementation(() => mockQueue as any);
 
       await analyzeCodebase(
         mockProjectPath,
@@ -422,7 +367,6 @@ describe('analyzeCodebase', () => {
         'jss-to-jss',
         '22.5',
         '22.6',
-        undefined,
         undefined,
         'gpt'
       );
@@ -458,7 +402,6 @@ describe('analyzeCodebase', () => {
         '22.5',
         '22.6',
         undefined,
-        undefined,
         'gpt'
       );
 
@@ -490,21 +433,13 @@ describe('analyzeCodebase', () => {
 
       vi.mocked(axios.post).mockResolvedValue({
         data: { jobId: 'test-job-id' },
+        status: 202,
       } as any);
 
-      vi.mocked(axios.post).mockResolvedValue({
-        data: {
-          reportUrl: 'http://example.com/report',
-          pdfUrl: 'http://example.com/report.pdf',
-          llmPromptUrl: 'http://example.com/prompt',
-        },
+      vi.mocked(axios.get).mockResolvedValue({
+        data: { percentComplete: 100, readyToFinalise: true },
+        status: 200,
       } as any);
-
-      const mockQueue = {
-        add: vi.fn().mockResolvedValue(undefined),
-        onIdle: vi.fn().mockResolvedValue(undefined),
-      };
-      vi.mocked(PQueue).mockImplementation(() => mockQueue as any);
 
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
@@ -515,12 +450,11 @@ describe('analyzeCodebase', () => {
         true,
         false,
         'v1',
-        undefined,
-        undefined,
-        'gpt',
         'jss-to-jss',
         '22.5',
-        '22.6'
+        '22.6',
+        undefined,
+        'gpt'
       );
 
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -531,10 +465,13 @@ describe('analyzeCodebase', () => {
     });
   });
 
-  describe('Job initialization and file upload', () => {
-    it('should initialize job and upload files', async () => {
+  describe('Job initialization and file enqueue', () => {
+    it('should initialize job with filesEnqueued count', async () => {
       const mockFiles = ['/test/project/src/components/Button.tsx'];
-      vi.mocked(glob).mockResolvedValue(mockFiles);
+      // First glob call returns the .ts/tsx files, second (package.json) returns nothing
+      vi.mocked(glob)
+        .mockResolvedValueOnce(mockFiles)
+        .mockResolvedValueOnce([]);
 
       const mockIgnore = {
         add: vi.fn(),
@@ -543,27 +480,23 @@ describe('analyzeCodebase', () => {
       vi.mocked(ignoreLib).mockReturnValue(mockIgnore as any);
 
       vi.mocked(classifyFileType).mockReturnValue('Component');
-      vi.mocked(buildServiceUrl).mockReturnValue(
-        'http://localhost:7071/api/jobs-initiate'
-      );
+      vi.mocked(buildServiceUrl).mockImplementation((_config, route) => {
+        if (route === 'jobs-initiate')
+          return 'http://localhost:7071/api/jobs-initiate';
+        if (route === 'jobs-enqueue')
+          return 'http://localhost:7071/api/jobs-enqueue';
+        return `http://localhost:7071/api/${route}`;
+      });
 
       vi.mocked(axios.post).mockResolvedValue({
         data: { jobId: 'test-job-id' },
+        status: 202,
       } as any);
 
-      vi.mocked(axios.post).mockResolvedValue({
-        data: {
-          reportUrl: 'http://example.com/report',
-          pdfUrl: 'http://example.com/report.pdf',
-          llmPromptUrl: 'http://example.com/prompt',
-        },
+      vi.mocked(axios.get).mockResolvedValue({
+        data: { percentComplete: 100, readyToFinalise: true },
+        status: 200,
       } as any);
-
-      const mockQueue = {
-        add: vi.fn().mockResolvedValue(undefined),
-        onIdle: vi.fn().mockResolvedValue(undefined),
-      };
-      vi.mocked(PQueue).mockImplementation(() => mockQueue as any);
 
       await analyzeCodebase(
         mockProjectPath,
@@ -576,10 +509,10 @@ describe('analyzeCodebase', () => {
         '22.5',
         '22.6',
         undefined,
-        undefined,
         'gpt'
       );
 
+      // jobs-initiate call should include filesEnqueued (1 ts/tsx file, 0 package.json)
       expect(axios.post).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
@@ -587,6 +520,7 @@ describe('analyzeCodebase', () => {
           product: 'jss-to-jss',
           fromVersion: '22.5',
           toVersion: '22.6',
+          filesEnqueued: 1,
         }),
         expect.objectContaining({
           headers: {
@@ -594,11 +528,72 @@ describe('analyzeCodebase', () => {
           },
         })
       );
-
-      expect(mockQueue.add).toHaveBeenCalled();
     });
 
-    it('should finalize job and display report URLs', async () => {
+    it('should enqueue files via jobs-enqueue with correct payload', async () => {
+      const mockFiles = ['/test/project/src/components/Button.tsx'];
+      vi.mocked(glob).mockResolvedValue(mockFiles);
+
+      const mockIgnore = {
+        add: vi.fn(),
+        ignores: vi.fn(() => false),
+      };
+      vi.mocked(ignoreLib).mockReturnValue(mockIgnore as any);
+
+      vi.mocked(classifyFileType).mockReturnValue('Component');
+      vi.mocked(buildServiceUrl).mockImplementation((_config, route) => {
+        if (route === 'jobs-initiate')
+          return 'http://localhost:7071/api/jobs-initiate';
+        if (route === 'jobs-enqueue')
+          return 'http://localhost:7071/api/jobs-enqueue';
+        return `http://localhost:7071/api/${route}`;
+      });
+
+      // First call returns jobId, subsequent calls (enqueue) return 202
+      vi.mocked(axios.post)
+        .mockResolvedValueOnce({
+          data: { jobId: 'test-job-id' },
+          status: 200,
+        } as any)
+        .mockResolvedValue({
+          data: {},
+          status: 202,
+        } as any);
+
+      vi.mocked(axios.get).mockResolvedValue({
+        data: { percentComplete: 100, readyToFinalise: true },
+        status: 200,
+      } as any);
+
+      await analyzeCodebase(
+        mockProjectPath,
+        mockApiKey,
+        false,
+        false,
+        false,
+        'v1',
+        'jss-to-jss',
+        '22.5',
+        '22.6',
+        undefined,
+        'gpt'
+      );
+
+      // enqueue call should use jobs-enqueue endpoint with jobId in body
+      expect(axios.post).toHaveBeenCalledWith(
+        'http://localhost:7071/api/jobs-enqueue',
+        expect.objectContaining({
+          jobId: 'test-job-id',
+          fileType: 'Component',
+          fileContent: 'file content',
+        }),
+        expect.objectContaining({
+          headers: { 'Ocp-Apim-Subscription-Key': mockApiKey },
+        })
+      );
+    });
+
+    it('should finalise job and display report URLs', async () => {
       vi.mocked(glob).mockResolvedValue([]);
 
       const mockIgnore = {
@@ -608,30 +603,31 @@ describe('analyzeCodebase', () => {
       vi.mocked(ignoreLib).mockReturnValue(mockIgnore as any);
 
       vi.mocked(classifyFileType).mockReturnValue('Component');
-      vi.mocked(buildServiceUrl).mockImplementation((config, route) => {
+      vi.mocked(buildServiceUrl).mockImplementation((_config, route) => {
         if (route.includes('finalise')) {
           return 'http://localhost:7071/api/jobs/test-job-id/finalise';
         }
         return 'http://localhost:7071/api/jobs-initiate';
       });
 
-      vi.mocked(axios.post).mockResolvedValue({
-        data: { jobId: 'test-job-id' },
-      } as any);
+      vi.mocked(axios.post)
+        .mockResolvedValueOnce({
+          data: { jobId: 'test-job-id' },
+          status: 200,
+        } as any)
+        .mockResolvedValue({
+          data: {
+            reportUrl: 'http://example.com/report',
+            pdfUrl: 'http://example.com/report.pdf',
+            llmPromptUrl: 'http://example.com/prompt',
+          },
+          status: 200,
+        } as any);
 
-      vi.mocked(axios.post).mockResolvedValue({
-        data: {
-          reportUrl: 'http://example.com/report',
-          pdfUrl: 'http://example.com/report.pdf',
-          llmPromptUrl: 'http://example.com/prompt',
-        },
+      vi.mocked(axios.get).mockResolvedValue({
+        data: { percentComplete: 100, readyToFinalise: true },
+        status: 200,
       } as any);
-
-      const mockQueue = {
-        add: vi.fn().mockResolvedValue(undefined),
-        onIdle: vi.fn().mockResolvedValue(undefined),
-      };
-      vi.mocked(PQueue).mockImplementation(() => mockQueue as any);
 
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
@@ -642,9 +638,9 @@ describe('analyzeCodebase', () => {
         false,
         false,
         'v1',
-        undefined,
-        undefined,
-        'gpt'
+        'jss-to-jss',
+        '22.5',
+        '22.6'
       );
 
       expect(axios.post).toHaveBeenCalledWith(
@@ -666,6 +662,109 @@ describe('analyzeCodebase', () => {
     });
   });
 
+  describe('Polling loop', () => {
+    it('should poll status and display progress until readyToFinalise', async () => {
+      vi.mocked(glob).mockResolvedValue([]);
+
+      const mockIgnore = {
+        add: vi.fn(),
+        ignores: vi.fn(() => false),
+      };
+      vi.mocked(ignoreLib).mockReturnValue(mockIgnore as any);
+
+      vi.mocked(axios.post)
+        .mockResolvedValueOnce({
+          data: { jobId: 'test-job-id' },
+          status: 200,
+        } as any)
+        .mockResolvedValue({
+          data: {
+            reportUrl: 'http://example.com/report',
+            pdfUrl: 'http://example.com/report.pdf',
+            llmPromptUrl: 'http://example.com/prompt',
+          },
+          status: 200,
+        } as any);
+
+      // First poll returns not ready, second returns ready
+      vi.mocked(axios.get)
+        .mockResolvedValueOnce({
+          data: { percentComplete: 50, readyToFinalise: false },
+          status: 200,
+        } as any)
+        .mockResolvedValueOnce({
+          data: { percentComplete: 100, readyToFinalise: true },
+          status: 200,
+        } as any);
+
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      await analyzeCodebase(
+        mockProjectPath,
+        mockApiKey,
+        false,
+        false,
+        false,
+        'v1',
+        'jss-to-jss',
+        '22.5',
+        '22.6'
+      );
+
+      expect(axios.get).toHaveBeenCalledTimes(2);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('50% complete')
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('100% complete')
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should abort after 3 consecutive polling errors', async () => {
+      vi.mocked(glob).mockResolvedValue([]);
+
+      const mockIgnore = {
+        add: vi.fn(),
+        ignores: vi.fn(() => false),
+      };
+      vi.mocked(ignoreLib).mockReturnValue(mockIgnore as any);
+
+      vi.mocked(axios.post).mockResolvedValue({
+        data: { jobId: 'test-job-id' },
+        status: 200,
+      } as any);
+
+      // All poll calls fail
+      vi.mocked(axios.get).mockRejectedValue(new Error('Network failure'));
+
+      const consoleSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const consoleLogSpy = vi
+        .spyOn(console, 'log')
+        .mockImplementation(() => {});
+
+      await expect(
+        analyzeCodebase(
+          mockProjectPath,
+          mockApiKey,
+          false,
+          false,
+          false,
+          'v1',
+          'jss-to-jss',
+          '22.5',
+          '22.6'
+        )
+      ).rejects.toThrow('Polling failed 3 consecutive times');
+
+      consoleSpy.mockRestore();
+      consoleLogSpy.mockRestore();
+    });
+  });
+
   describe('Error handling', () => {
     it('should handle job initialization errors', async () => {
       vi.mocked(glob).mockResolvedValue([]);
@@ -679,14 +778,24 @@ describe('analyzeCodebase', () => {
       vi.mocked(classifyFileType).mockReturnValue('Component');
 
       const error = new Error('Network error');
-      vi.mocked(axios.get).mockRejectedValue(error);
+      vi.mocked(axios.post).mockRejectedValue(error);
 
       const consoleSpy = vi
         .spyOn(console, 'error')
         .mockImplementation(() => {});
 
       await expect(
-        analyzeCodebase(mockProjectPath, mockApiKey, false, false, false, 'v1')
+        analyzeCodebase(
+          mockProjectPath,
+          mockApiKey,
+          false,
+          false,
+          false,
+          'v1',
+          'jss-to-jss',
+          '22.5',
+          '22.6'
+        )
       ).rejects.toThrow();
 
       expect(consoleSpy).toHaveBeenCalledWith(

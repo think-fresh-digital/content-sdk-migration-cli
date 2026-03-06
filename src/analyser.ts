@@ -13,9 +13,10 @@ import { Product } from './interfaces/migrationInterfaces.js';
 import {
   JobInitiateRequest,
   JobInitiateResponse,
+  JobEnqueueRequest,
+  JobStatusResponse,
 } from './interfaces/jobInterfaces.js';
 import PQueue from 'p-queue';
-import { DEFAULT_THROTTLE } from './lib/throttleDefaults.js';
 
 // Central list of file types to include in analysis and in log messages
 const FILE_TYPES_TO_ANALYZE: string[] = [
@@ -30,6 +31,11 @@ const FILE_TYPES_TO_ANALYZE: string[] = [
 
 // Allow a longer timeout for the finalise request, which can take a while server-side
 const FINALISE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+
+const ENQUEUE_CONCURRENCY = 10;
+const POLL_INTERVAL_MS = 3000;
+const POLL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+const MAX_POLL_ERRORS = 3;
 
 function emojiForFileType(fileType: string): string {
   switch (fileType) {
@@ -56,86 +62,6 @@ function emojiForFileType(fileType: string): string {
 function sleep(ms: number): Promise<void> {
   return delay(ms).then(() => undefined);
 }
-
-function isTimeoutError(error: unknown): boolean {
-  return (
-    axios.isAxiosError(error) &&
-    (error.code === 'ECONNABORTED' ||
-      (typeof error.message === 'string' && error.message.includes('timeout')))
-  );
-}
-
-function getRetryAfterMs(error: unknown): number | undefined {
-  if (!axios.isAxiosError(error)) return undefined;
-  const header = error.response?.headers?.['retry-after'];
-  if (!header) return undefined;
-  const asNumber = Number(header);
-  if (!Number.isNaN(asNumber)) {
-    return asNumber * 1000;
-  }
-  const asDate = Date.parse(header);
-  if (!Number.isNaN(asDate)) {
-    const delta = asDate - Date.now();
-    return delta > 0 ? delta : 0;
-  }
-  return undefined;
-}
-
-async function withRetry<T>(
-  operation: () => Promise<T>,
-  options?: {
-    retries?: number;
-    minDelayMs?: number;
-    maxDelayMs?: number;
-    verbose?: boolean;
-  }
-): Promise<T> {
-  const retries = options?.retries ?? 3;
-  const minDelayMs = options?.minDelayMs ?? 1000;
-  const maxDelayMs = options?.maxDelayMs ?? 8000;
-  const verbose = options?.verbose ?? false;
-
-  for (let attempt = 1; attempt <= retries; attempt += 1) {
-    try {
-      return await operation();
-    } catch (error) {
-      const status = axios.isAxiosError(error)
-        ? error.response?.status
-        : undefined;
-      const retryableStatus =
-        status === 408 ||
-        status === 429 ||
-        (typeof status === 'number' && status >= 500);
-      const retryable = isTimeoutError(error) || retryableStatus;
-
-      if (attempt === retries || !retryable) {
-        throw error;
-      }
-
-      const headerDelay = getRetryAfterMs(error);
-      const expDelay = Math.min(maxDelayMs, minDelayMs * 2 ** (attempt - 1));
-      const jitter = Math.floor(Math.random() * 250);
-      const delayMs = headerDelay ?? expDelay + jitter;
-
-      const reason = status
-        ? `HTTP ${status}`
-        : isTimeoutError(error)
-          ? 'timeout'
-          : 'error';
-      if (verbose) {
-        console.log(
-          chalk.yellow(
-            `Retrying request (attempt ${attempt + 1}/${retries}) after ${delayMs}ms due to ${reason}`
-          )
-        );
-      }
-      await sleep(delayMs);
-    }
-  }
-
-  // Should never reach here
-  throw new Error('unreachable');
-}
 /* v8 ignore end */
 
 export async function analyzeCodebase(
@@ -148,7 +74,6 @@ export async function analyzeCodebase(
   product: Product,
   fromVersion: string,
   toVersion: string,
-  throttle?: { maxConcurrent: number; intervalCap: number; intervalMs: number },
   gitignorePathOverride?: string,
   modelType: 'deepseek' | 'claude' | 'gpt' = 'deepseek'
 ) {
@@ -161,14 +86,7 @@ export async function analyzeCodebase(
   );
 
   // Get configuration
-  const config = getConfig(
-    apiKey,
-    debug,
-    verbose,
-    whatIf,
-    serviceVersion,
-    throttle
-  );
+  const config = getConfig(apiKey, debug, verbose, whatIf, serviceVersion);
 
   // Check if the project path exists
   if (!fs.existsSync(projectPath)) {
@@ -325,7 +243,9 @@ async function readAndAnalyzeFiles(
   try {
     // Track analysis start time
     const startTimeMs = Date.now();
-    // 1. Start a new job to get a jobId
+    const totalFiles = filePaths.length;
+
+    // 1. Start a new job, passing the file count so the backend knows when all files are enqueued
     console.log(chalk.blue('Initializing new analysis job...'));
 
     const jobRequest: JobInitiateRequest = {
@@ -333,6 +253,7 @@ async function readAndAnalyzeFiles(
       product,
       fromVersion,
       toVersion,
+      filesEnqueued: totalFiles,
     };
 
     const jobResponse = await axios.post<JobInitiateResponse>(
@@ -349,138 +270,121 @@ async function readAndAnalyzeFiles(
 
     console.log(chalk.gray(`Job ID: ${jobId}`));
 
-    // 2. Send files for analysis with throttling
+    // 2. Enqueue files for cloud analysis
     console.log(
-      chalk.blue(
-        `Uploading ${filePaths.length} files for analysis (${FILE_TYPES_TO_ANALYZE.join(', ')})...`
-      )
+      chalk.blue(`Submitting ${totalFiles} files for cloud analysis...`)
     );
 
-    const totalFiles = filePaths.length;
-    let completedCount = 0;
-    const timedOutFiles: string[] = [];
-    const failedFiles: Array<{ filePath: string; error: string }> = [];
+    const queue = new PQueue({ concurrency: ENQUEUE_CONCURRENCY });
 
-    const concurrency =
-      config.THROTTLE?.maxConcurrent ?? DEFAULT_THROTTLE.maxConcurrent;
-    const intervalCap =
-      config.THROTTLE?.intervalCap ?? DEFAULT_THROTTLE.intervalCap;
-    const interval = config.THROTTLE?.intervalMs ?? DEFAULT_THROTTLE.intervalMs;
-
-    const queue = new PQueue({
-      concurrency,
-      intervalCap,
-      interval,
-      carryoverConcurrencyCount: true,
-      autoStart: true,
-    });
-
-    const analysisPromises = filePaths.map(async filePath => {
-      const fileContents = fs.readFileSync(filePath, 'utf-8');
+    const enqueuePromises = filePaths.map(async filePath => {
+      const fileContent = fs.readFileSync(filePath, 'utf-8');
       const relativePath = path.relative(projectPath, filePath);
       const fileType = classifyFileType(relativePath);
 
-      const payload = { filePath: relativePath, fileType, fileContents };
+      const payload: JobEnqueueRequest = {
+        jobId,
+        filePath: relativePath,
+        fileType,
+        fileContent,
+      };
 
-      try {
-        await queue.add(() =>
-          withRetry(
-            () =>
-              axios.post(
-                buildServiceUrl(config, `jobs/${jobId}/analyse-file`),
-                payload,
-                {
-                  headers: {
-                    'Ocp-Apim-Subscription-Key': config.SERVICE_KEY,
-                  },
-                  timeout: DEFAULT_THROTTLE.timeoutMs,
-                }
-              ),
-            {
-              retries: 4,
-              minDelayMs: 1000,
-              maxDelayMs: 10000,
-              verbose: config.VERBOSE,
-            }
-          )
-        );
-
-        completedCount += 1;
-        const percent = Math.round((completedCount / totalFiles) * 100);
-        console.log(
-          chalk.gray(
-            `${completedCount} of ${totalFiles} files analysed (${percent}%)`
-          )
-        );
-      } catch (error: unknown) {
-        // Handle different types of errors
-        if (isTimeoutError(error)) {
-          timedOutFiles.push(relativePath);
-          return; // abandon this file without throwing
-        }
-
-        // For server errors, collect them but don't fail the entire process
-        let errorMessage = 'Unknown error';
-        if (axios.isAxiosError(error)) {
-          if (error.response) {
-            errorMessage = `HTTP ${error.response.status}: ${error.response.statusText}`;
-            if (error.response.data) {
-              errorMessage += ` - ${JSON.stringify(error.response.data)}`;
-            }
-          } else if (error.request) {
-            errorMessage = 'Network error: No response received from server';
-          } else {
-            errorMessage = `Request error: ${error.message}`;
+      await queue.add(async () => {
+        const response = await axios.post(
+          buildServiceUrl(config, 'jobs-enqueue'),
+          payload,
+          {
+            headers: {
+              'Ocp-Apim-Subscription-Key': config.SERVICE_KEY,
+            },
           }
-        } else if (error instanceof Error) {
-          errorMessage = error.message;
-        } else {
-          errorMessage = String(error);
-        }
+        );
 
-        failedFiles.push({ filePath: relativePath, error: errorMessage });
-        return; // abandon this file without throwing
-      }
+        if (response.status < 200 || response.status >= 300) {
+          throw new Error(
+            `Failed to enqueue ${relativePath}: HTTP ${response.status}`
+          );
+        }
+      });
     });
 
-    // Wait for all file uploads to complete (timeouts are handled per promise)
-    await Promise.all(analysisPromises);
+    await Promise.all(enqueuePromises);
     await queue.onIdle();
 
-    if (timedOutFiles.length > 0) {
-      console.log(
-        chalk.yellow(
-          `\nThe following ${timedOutFiles.length} file(s) timed out after ${Math.round(
-            DEFAULT_THROTTLE.timeoutMs / 1000
-          )}s and were not analysed:`
-        )
-      );
-      timedOutFiles.forEach(fp => console.log(chalk.yellow(` - ${fp}`)));
-    }
-
-    if (failedFiles.length > 0) {
-      console.log(
-        chalk.red(
-          `\nThe following ${failedFiles.length} file(s) failed during analysis:`
-        )
-      );
-      failedFiles.forEach(({ filePath, error }) =>
-        console.log(chalk.red(` - ${filePath}: ${error}`))
-      );
-    }
-
-    const successfulFiles =
-      totalFiles - timedOutFiles.length - failedFiles.length;
     console.log(
-      chalk.green(
-        `${successfulFiles} of ${totalFiles} files analyzed successfully.`
-      )
+      chalk.blue('All files submitted for analysis. Waiting for results...')
     );
 
-    // 3. Finalize the job to get the report
-    console.log(chalk.blue('Finalising job and generating report...'));
+    // 3. Poll for completion
+    const pollDeadline = Date.now() + POLL_TIMEOUT_MS;
+    let pollErrorCount = 0;
+    let readyToFinalise = false;
 
-    // This will be updated when the finalise endpoint is implemented
+    while (!readyToFinalise) {
+      if (Date.now() >= pollDeadline) {
+        console.error(
+          chalk.red(
+            '\nAnalysis timed out after 30 minutes. The backend may still be processing — check your job status manually or contact support.'
+          )
+        );
+        process.exit(1);
+      }
+
+      /* v8 ignore next */
+      await sleep(POLL_INTERVAL_MS);
+
+      let statusResponse;
+      try {
+        statusResponse = await axios.get<JobStatusResponse>(
+          buildServiceUrl(config, `jobs/${jobId}/status`),
+          {
+            headers: {
+              'Ocp-Apim-Subscription-Key': config.SERVICE_KEY,
+            },
+          }
+        );
+        pollErrorCount = 0;
+      } catch (error) {
+        pollErrorCount += 1;
+
+        let errorDetail = 'Unknown error';
+        if (axios.isAxiosError(error) && error.response) {
+          errorDetail = `HTTP ${error.response.status}: ${error.response.statusText}`;
+        } else if (error instanceof Error) {
+          errorDetail = error.message;
+        }
+
+        console.log(
+          chalk.yellow(
+            `Polling error (${pollErrorCount}/${MAX_POLL_ERRORS}): ${errorDetail}`
+          )
+        );
+
+        if (pollErrorCount >= MAX_POLL_ERRORS) {
+          throw new Error(
+            `Polling failed ${MAX_POLL_ERRORS} consecutive times. Last error: ${errorDetail}`
+          );
+        }
+
+        continue;
+      }
+
+      const { percentComplete, readyToFinalise: isReady } = statusResponse.data;
+      const completedFiles = Math.round((percentComplete / 100) * totalFiles);
+      console.log(
+        chalk.gray(
+          `Analysing... ${percentComplete}% complete (${completedFiles}/${totalFiles} files)`
+        )
+      );
+
+      if (isReady) {
+        readyToFinalise = true;
+      }
+    }
+
+    // 4. Finalize the job to get the report
+    console.log(chalk.blue('Analysis complete. Generating report...'));
+
     const finalizeResponse = await axios.post(
       buildServiceUrl(config, `jobs/${jobId}/finalise`),
       undefined,
@@ -494,7 +398,7 @@ async function readAndAnalyzeFiles(
     );
     const { reportUrl, pdfUrl, llmPromptUrl } = finalizeResponse.data;
 
-    // 4. Display the final report URL with elapsed time in minutes
+    // 5. Display the final report URL with elapsed time in minutes
     const elapsedMinutes = ((Date.now() - startTimeMs) / 60000).toFixed(2);
     console.log(
       chalk.bold.green(
@@ -542,7 +446,7 @@ async function readAndAnalyzeFiles(
       console.error(chalk.red(`Error: ${error.message}`));
       console.error(chalk.red(`Stack trace: ${error.stack}`));
     } else {
-      console.error(chalk.red(`Unknown esrror: ${String(error)}`));
+      console.error(chalk.red(`Unknown error: ${String(error)}`));
     }
 
     // Re-throw the error so it can be handled by the calling function

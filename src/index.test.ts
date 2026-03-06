@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { analyzeCodebase } from './analyser.js';
-import { DEFAULT_THROTTLE } from './lib/throttleDefaults.js';
 
 // Mock the analyser module
 vi.mock('./analyser.js', () => ({
@@ -80,9 +79,6 @@ describe('CLI Entry Point', () => {
         debug: false,
         verbose: false,
         whatIf: false,
-        maxConcurrent: DEFAULT_THROTTLE.maxConcurrent,
-        intervalCap: DEFAULT_THROTTLE.intervalCap,
-        intervalMs: DEFAULT_THROTTLE.intervalMs,
         serviceVersion: 'v1',
         modelType: 'gpt',
       });
@@ -108,9 +104,6 @@ describe('CLI Entry Point', () => {
         debug: false,
         verbose: false,
         whatIf: false,
-        maxConcurrent: DEFAULT_THROTTLE.maxConcurrent,
-        intervalCap: DEFAULT_THROTTLE.intervalCap,
-        intervalMs: DEFAULT_THROTTLE.intervalMs,
         serviceVersion: 'v1',
         modelType: 'gpt',
       });
@@ -132,9 +125,6 @@ describe('CLI Entry Point', () => {
         debug: true,
         verbose: false,
         whatIf: false,
-        maxConcurrent: DEFAULT_THROTTLE.maxConcurrent,
-        intervalCap: DEFAULT_THROTTLE.intervalCap,
-        intervalMs: DEFAULT_THROTTLE.intervalMs,
         serviceVersion: 'v1',
         modelType: 'gpt',
       });
@@ -152,108 +142,11 @@ describe('CLI Entry Point', () => {
         mockMigrationSelection.product,
         mockMigrationSelection.fromVersion,
         mockMigrationSelection.toVersion,
-        expect.objectContaining({
-          maxConcurrent: DEFAULT_THROTTLE.maxConcurrent,
-          intervalCap: DEFAULT_THROTTLE.intervalCap,
-          intervalMs: DEFAULT_THROTTLE.intervalMs,
-        }),
-        undefined,
+        undefined, // gitignore
         'gpt'
       );
 
       consoleSpy.mockRestore();
-    });
-  });
-
-  describe('Throttle warning messages', () => {
-    it('should warn when maxConcurrent exceeds default', async () => {
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const consoleLogSpy = vi
-        .spyOn(console, 'log')
-        .mockImplementation(() => {});
-
-      const unsafeValue = DEFAULT_THROTTLE.maxConcurrent + 1;
-      await handleReportCommand({
-        path: '/test/path',
-        apiKey: 'test-key',
-        debug: false,
-        verbose: false,
-        whatIf: false,
-        maxConcurrent: unsafeValue,
-        intervalCap: DEFAULT_THROTTLE.intervalCap,
-        intervalMs: DEFAULT_THROTTLE.intervalMs,
-        serviceVersion: 'v1',
-        modelType: 'gpt',
-      });
-
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining(
-          `WARNING: --maxConcurrent=${unsafeValue} exceeds safe default`
-        )
-      );
-
-      consoleSpy.mockRestore();
-      consoleLogSpy.mockRestore();
-    });
-
-    it('should warn when intervalMs is below default', async () => {
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const consoleLogSpy = vi
-        .spyOn(console, 'log')
-        .mockImplementation(() => {});
-
-      const unsafeValue = DEFAULT_THROTTLE.intervalMs - 1;
-      await handleReportCommand({
-        path: '/test/path',
-        apiKey: 'test-key',
-        debug: false,
-        verbose: false,
-        whatIf: false,
-        maxConcurrent: DEFAULT_THROTTLE.maxConcurrent,
-        intervalCap: DEFAULT_THROTTLE.intervalCap,
-        intervalMs: unsafeValue,
-        serviceVersion: 'v1',
-        modelType: 'gpt',
-      });
-
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining(
-          `WARNING: --intervalMs=${unsafeValue} is below safe default`
-        )
-      );
-
-      consoleSpy.mockRestore();
-      consoleLogSpy.mockRestore();
-    });
-
-    it('should warn when intervalCap exceeds default', async () => {
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const consoleLogSpy = vi
-        .spyOn(console, 'log')
-        .mockImplementation(() => {});
-
-      const unsafeValue = DEFAULT_THROTTLE.intervalCap + 1;
-      await handleReportCommand({
-        path: '/test/path',
-        apiKey: 'test-key',
-        debug: false,
-        verbose: false,
-        whatIf: false,
-        maxConcurrent: DEFAULT_THROTTLE.maxConcurrent,
-        intervalCap: unsafeValue,
-        intervalMs: DEFAULT_THROTTLE.intervalMs,
-        serviceVersion: 'v1',
-        modelType: 'gpt',
-      });
-
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining(
-          `WARNING: --intervalCap=${unsafeValue} exceeds safe default`
-        )
-      );
-
-      consoleSpy.mockRestore();
-      consoleLogSpy.mockRestore();
     });
   });
 
@@ -267,9 +160,6 @@ describe('CLI Entry Point', () => {
         debug: false,
         verbose: true,
         whatIf: false,
-        maxConcurrent: DEFAULT_THROTTLE.maxConcurrent,
-        intervalCap: DEFAULT_THROTTLE.intervalCap,
-        intervalMs: DEFAULT_THROTTLE.intervalMs,
         serviceVersion: 'v2',
         modelType: 'gpt',
       });
@@ -287,51 +177,8 @@ describe('CLI Entry Point', () => {
         mockMigrationSelection.product,
         mockMigrationSelection.fromVersion,
         mockMigrationSelection.toVersion,
-        expect.objectContaining({
-          maxConcurrent: DEFAULT_THROTTLE.maxConcurrent,
-          intervalCap: DEFAULT_THROTTLE.intervalCap,
-          intervalMs: DEFAULT_THROTTLE.intervalMs,
-        }),
         undefined, // gitignore
         'gpt' // modelType
-      );
-
-      consoleSpy.mockRestore();
-    });
-
-    it('should pass throttle options correctly', async () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-      await handleReportCommand({
-        path: '/test/path',
-        apiKey: 'test-api-key',
-        debug: false,
-        verbose: false,
-        whatIf: false,
-        maxConcurrent: 4,
-        intervalCap: 8,
-        intervalMs: 1000,
-        serviceVersion: 'v1',
-        modelType: 'gpt',
-      });
-
-      expect(analyzeCodebase).toHaveBeenCalledWith(
-        '/test/path',
-        'test-api-key',
-        false,
-        false,
-        false,
-        'v1',
-        mockMigrationSelection.product,
-        mockMigrationSelection.fromVersion,
-        mockMigrationSelection.toVersion,
-        {
-          maxConcurrent: 4,
-          intervalCap: 8,
-          intervalMs: 1000,
-        },
-        undefined,
-        'gpt'
       );
 
       consoleSpy.mockRestore();
@@ -346,9 +193,6 @@ describe('CLI Entry Point', () => {
         debug: false,
         verbose: false,
         whatIf: false,
-        maxConcurrent: DEFAULT_THROTTLE.maxConcurrent,
-        intervalCap: DEFAULT_THROTTLE.intervalCap,
-        intervalMs: DEFAULT_THROTTLE.intervalMs,
         serviceVersion: 'v1',
         gitignore: '/custom/.gitignore',
         modelType: 'gpt',
@@ -364,7 +208,6 @@ describe('CLI Entry Point', () => {
         mockMigrationSelection.product,
         mockMigrationSelection.fromVersion,
         mockMigrationSelection.toVersion,
-        expect.any(Object),
         '/custom/.gitignore',
         'gpt'
       );
@@ -390,9 +233,6 @@ describe('CLI Entry Point', () => {
         debug: false,
         verbose: false,
         whatIf: false,
-        maxConcurrent: DEFAULT_THROTTLE.maxConcurrent,
-        intervalCap: DEFAULT_THROTTLE.intervalCap,
-        intervalMs: DEFAULT_THROTTLE.intervalMs,
         serviceVersion: 'v1',
         modelType: 'gpt',
       });

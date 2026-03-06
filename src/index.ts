@@ -3,7 +3,6 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { analyzeCodebase } from './analyser.js';
-import { DEFAULT_THROTTLE } from './lib/throttleDefaults.js';
 import { resolveMigrationSelection } from './lib/promptMigrationOptions.js';
 
 const program = new Command();
@@ -23,9 +22,6 @@ export async function handleReportCommand(options: {
   debug: boolean;
   verbose: boolean;
   whatIf: boolean;
-  maxConcurrent: number;
-  intervalCap: number;
-  intervalMs: number;
   serviceVersion: string;
   modelType: 'deepseek' | 'claude' | 'gpt';
   product?: string;
@@ -72,33 +68,6 @@ export async function handleReportCommand(options: {
       toVersion: options.toVersion,
     });
 
-    const defaultMaxConcurrent = DEFAULT_THROTTLE.maxConcurrent;
-    const defaultIntervalCap = DEFAULT_THROTTLE.intervalCap;
-    const defaultIntervalMs = DEFAULT_THROTTLE.intervalMs;
-
-    // Warnings for unsafe overrides
-    if (options.maxConcurrent > defaultMaxConcurrent) {
-      console.warn(
-        chalk.bgYellow.black(
-          `WARNING: --maxConcurrent=${options.maxConcurrent} exceeds safe default (${defaultMaxConcurrent}). This can cause service timeouts.`
-        )
-      );
-    }
-    if (options.intervalMs < defaultIntervalMs) {
-      console.warn(
-        chalk.bgYellow.black(
-          `WARNING: --intervalMs=${options.intervalMs} is below safe default (${defaultIntervalMs}). This increases rate-limit risk.`
-        )
-      );
-    }
-    if (options.intervalCap > defaultIntervalCap) {
-      console.warn(
-        chalk.bgYellow.black(
-          `WARNING: --intervalCap=${options.intervalCap} exceeds safe default (${defaultIntervalCap}). This increases rate-limit risk.`
-        )
-      );
-    }
-
     await analyzeCodebase(
       options.path,
       options.apiKey,
@@ -109,11 +78,6 @@ export async function handleReportCommand(options: {
       migrationSelection.product,
       migrationSelection.fromVersion,
       migrationSelection.toVersion,
-      {
-        maxConcurrent: options.maxConcurrent,
-        intervalCap: options.intervalCap,
-        intervalMs: options.intervalMs,
-      },
       options.gitignore,
       options.modelType as 'deepseek' | 'claude' | 'gpt'
     );
@@ -153,24 +117,6 @@ program
   .option(
     '--toVersion <version>',
     'Target version for selected product and fromVersion (e.g. 22.6, 1.4.1)'
-  )
-  .option(
-    '--maxConcurrent <number>',
-    'Max in-flight requests',
-    (value: string) => parseInt(value, 10),
-    DEFAULT_THROTTLE.maxConcurrent
-  )
-  .option(
-    '--intervalCap <number>',
-    'Max requests per interval',
-    (value: string) => parseInt(value, 10),
-    DEFAULT_THROTTLE.intervalCap
-  )
-  .option(
-    '--intervalMs <number>',
-    'Interval window in ms',
-    (value: string) => parseInt(value, 10),
-    DEFAULT_THROTTLE.intervalMs
   )
   .option(
     '--serviceVersion <version>',

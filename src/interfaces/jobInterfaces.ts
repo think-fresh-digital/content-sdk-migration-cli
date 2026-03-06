@@ -5,8 +5,21 @@ export interface JobInitiateRequest {
   product: Product;
   fromVersion: string;
   toVersion: string;
+  filesEnqueued: number;
 }
 
 export interface JobInitiateResponse {
   jobId: string;
+}
+
+export interface JobEnqueueRequest {
+  jobId: string;
+  filePath: string;
+  fileType: string;
+  fileContent: string;
+}
+
+export interface JobStatusResponse {
+  percentComplete: number;
+  readyToFinalise: boolean;
 }

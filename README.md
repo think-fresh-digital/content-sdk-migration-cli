@@ -46,14 +46,6 @@ content-sdk-migrate report --path . --whatIf
 # Use local debug service (no API key required when --debug is used)
 content-sdk-migrate report --path . --debug
 
-# Tune request throttling
-content-sdk-migrate report \
-  --path . \
-  --apiKey <api-key> \
-  --maxConcurrent 8 \
-  --intervalCap 16 \
-  --intervalMs 1000
-
 # Specify model type for analysis
 content-sdk-migrate report --path . --apiKey <api-key> --modelType claude
 ```
@@ -71,11 +63,6 @@ content-sdk-migrate report --path . --apiKey <api-key> --modelType claude
 - `--toVersion <version>`: Target version for the selected product and `--fromVersion` (for example `22.6`, `1.4.1`, `1.5.0`). The CLI enforces only valid combinations; if omitted in an interactive TTY session, you will be prompted to choose a compatible target.
 - `--serviceVersion <version>`: Service version to use (default: `v1`)
 - `--modelType <type>`: Model type to use for analysis: `deepseek`, `claude`, or `gpt` (default: `deepseek`)
-- `--maxConcurrent <number>`: Max in-flight requests (default safe value is used)
-- `--intervalCap <number>`: Max requests per interval window (default safe value is used)
-- `--intervalMs <number>`: Interval window in milliseconds (default safe value is used)
-
-Note: The CLI warns when throttle overrides are potentially unsafe.
 
 ### How the .gitignore is used
 

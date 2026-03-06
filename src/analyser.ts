@@ -78,7 +78,7 @@ export async function analyzeCodebase(
   modelType: 'deepseek' | 'claude' | 'gpt' = 'deepseek'
 ) {
   // Display CLI version
-  console.log(chalk.blue('Content SDK Migration CLI v0.2.0-beta.1'));
+  console.log(chalk.blue('Content SDK Migration CLI v1.0.0'));
   console.log(
     chalk.gray(
       'AI-powered CLI to accelerate the migration of Sitecore JSS Next.js apps to the Content SDK\n'

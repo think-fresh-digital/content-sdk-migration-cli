@@ -23,7 +23,13 @@ describe('migrationOptions', () => {
     const expectations: Record<Product, string[]> = {
       'jss-to-jss': ['22.5', '22.6', '22.7'],
       'jss-to-content-sdk': ['22.8', '22.9', '22.10'],
-      'content-sdk-to-content-sdk': ['1.3.1', '1.4.1'],
+      'content-sdk-to-content-sdk': [
+        '1.0.0',
+        '1.1.0',
+        '1.2.0',
+        '1.3.1',
+        '1.4.1',
+      ],
     };
 
     (Object.keys(expectations) as Product[]).forEach(product => {
@@ -41,7 +47,7 @@ describe('migrationOptions', () => {
     });
 
     it('should return correct toVersions for jss-to-content-sdk', () => {
-      const expected = ['1.0.0', '1.3.1', '1.4.1', '1.5.0'];
+      const expected = ['1.0.0', '1.1.0', '1.2.0', '1.3.1', '1.4.1', '1.5.0'];
       expect(getAllowedToVersions('jss-to-content-sdk', '22.8')).toEqual(
         expected
       );
@@ -54,6 +60,15 @@ describe('migrationOptions', () => {
     });
 
     it('should return correct toVersions for content-sdk-to-content-sdk', () => {
+      expect(
+        getAllowedToVersions('content-sdk-to-content-sdk', '1.0.0')
+      ).toEqual(['1.1.0']);
+      expect(
+        getAllowedToVersions('content-sdk-to-content-sdk', '1.1.0')
+      ).toEqual(['1.2.0']);
+      expect(
+        getAllowedToVersions('content-sdk-to-content-sdk', '1.2.0')
+      ).toEqual(['1.3.1']);
       expect(
         getAllowedToVersions('content-sdk-to-content-sdk', '1.3.1')
       ).toEqual(['1.4.1', '1.5.0']);
@@ -72,6 +87,16 @@ describe('migrationOptions', () => {
       { product: 'jss-to-jss', fromVersion: '22.5', toVersion: '22.6' },
       { product: 'jss-to-jss', fromVersion: '22.6', toVersion: '22.7' },
       { product: 'jss-to-jss', fromVersion: '22.7', toVersion: '22.8' },
+      {
+        product: 'jss-to-content-sdk',
+        fromVersion: '22.8',
+        toVersion: '1.1.0',
+      },
+      {
+        product: 'jss-to-content-sdk',
+        fromVersion: '22.8',
+        toVersion: '1.2.0',
+      },
       {
         product: 'jss-to-content-sdk',
         fromVersion: '22.8',
@@ -96,6 +121,21 @@ describe('migrationOptions', () => {
         product: 'jss-to-content-sdk',
         fromVersion: '22.10',
         toVersion: '1.5.0',
+      },
+      {
+        product: 'content-sdk-to-content-sdk',
+        fromVersion: '1.0.0',
+        toVersion: '1.1.0',
+      },
+      {
+        product: 'content-sdk-to-content-sdk',
+        fromVersion: '1.1.0',
+        toVersion: '1.2.0',
+      },
+      {
+        product: 'content-sdk-to-content-sdk',
+        fromVersion: '1.2.0',
+        toVersion: '1.3.1',
       },
       {
         product: 'content-sdk-to-content-sdk',
@@ -137,6 +177,16 @@ describe('migrationOptions', () => {
         product: 'content-sdk-to-content-sdk',
         fromVersion: '1.3.1',
         toVersion: '22.8',
+      },
+      {
+        product: 'content-sdk-to-content-sdk',
+        fromVersion: '1.0.0',
+        toVersion: '1.3.1',
+      },
+      {
+        product: 'content-sdk-to-content-sdk',
+        fromVersion: '1.1.0',
+        toVersion: '1.4.1',
       },
     ];
 

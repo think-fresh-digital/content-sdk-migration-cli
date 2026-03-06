@@ -12,7 +12,7 @@ program
   .description(
     'AI-powered CLI to accelerate the migration of Sitecore JSS Next.js apps to the SitecoreAI Content SDK'
   )
-  .version('1.0.0');
+  .version('1.0.2');
 
 // Export the handler function for testing
 export async function handleReportCommand(options: {

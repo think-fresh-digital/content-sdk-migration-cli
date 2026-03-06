@@ -46,17 +46,25 @@ describe('migrationOptions', () => {
       expect(getAllowedToVersions('jss-to-jss', '22.7')).toEqual(['22.8']);
     });
 
-    it('should return correct toVersions for jss-to-content-sdk', () => {
-      const expected = ['1.0.0', '1.1.0', '1.2.0', '1.3.1', '1.4.1', '1.5.0'];
-      expect(getAllowedToVersions('jss-to-content-sdk', '22.8')).toEqual(
-        expected
-      );
-      expect(getAllowedToVersions('jss-to-content-sdk', '22.9')).toEqual(
-        expected
-      );
-      expect(getAllowedToVersions('jss-to-content-sdk', '22.10')).toEqual(
-        expected
-      );
+    it('should return correct toVersions for jss-to-content-sdk (from-dependent)', () => {
+      expect(getAllowedToVersions('jss-to-content-sdk', '22.8')).toEqual([
+        '1.0.0',
+        '1.1.0',
+        '1.2.0',
+        '1.3.1',
+        '1.4.1',
+        '1.5.0',
+      ]);
+      expect(getAllowedToVersions('jss-to-content-sdk', '22.9')).toEqual([
+        '1.3.1',
+        '1.4.1',
+        '1.5.0',
+      ]);
+      expect(getAllowedToVersions('jss-to-content-sdk', '22.10')).toEqual([
+        '1.3.1',
+        '1.4.1',
+        '1.5.0',
+      ]);
     });
 
     it('should return correct toVersions for content-sdk-to-content-sdk', () => {
@@ -167,6 +175,16 @@ describe('migrationOptions', () => {
         product: 'jss-to-content-sdk',
         fromVersion: '22.8',
         toVersion: '22.9',
+      },
+      {
+        product: 'jss-to-content-sdk',
+        fromVersion: '22.9',
+        toVersion: '1.1.0',
+      },
+      {
+        product: 'jss-to-content-sdk',
+        fromVersion: '22.10',
+        toVersion: '1.0.0',
       },
       {
         product: 'content-sdk-to-content-sdk',

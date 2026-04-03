@@ -75,10 +75,10 @@ export async function analyzeCodebase(
   fromVersion: string,
   toVersion: string,
   gitignorePathOverride?: string,
-  modelType: 'deepseek' | 'claude' | 'gpt' = 'deepseek'
+  modelType: 'deepseek' | 'claude' | 'gpt' | 'auto' = 'deepseek'
 ) {
   // Display CLI version
-  console.log(chalk.blue('Content SDK Migration CLI v1.0.2'));
+  console.log(chalk.blue('Content SDK Migration CLI v1.0.3'));
   console.log(
     chalk.gray(
       'AI-powered CLI to accelerate the migration of Sitecore JSS Next.js apps to the Content SDK\n'
@@ -235,7 +235,7 @@ async function readAndAnalyzeFiles(
   projectPath: string,
   filePaths: string[],
   config: ServiceConfig,
-  modelType: 'deepseek' | 'claude' | 'gpt',
+  modelType: 'deepseek' | 'claude' | 'gpt' | 'auto',
   product: Product,
   fromVersion: string,
   toVersion: string

@@ -12,7 +12,7 @@ program
   .description(
     'AI-powered CLI to accelerate the migration of Sitecore JSS Next.js apps to the SitecoreAI Content SDK'
   )
-  .version('1.0.2');
+  .version('1.0.3');
 
 // Export the handler function for testing
 export async function handleReportCommand(options: {
@@ -23,7 +23,7 @@ export async function handleReportCommand(options: {
   verbose: boolean;
   whatIf: boolean;
   serviceVersion: string;
-  modelType: 'deepseek' | 'claude' | 'gpt';
+  modelType: 'deepseek' | 'claude' | 'gpt' | 'auto';
   product?: string;
   fromVersion?: string;
   toVersion?: string;
@@ -48,7 +48,7 @@ export async function handleReportCommand(options: {
     }
 
     // Validate modelType
-    const validModelTypes = ['deepseek', 'claude', 'gpt'];
+    const validModelTypes = ['deepseek', 'claude', 'gpt', 'auto'];
     if (!validModelTypes.includes(options.modelType)) {
       console.error(
         chalk.red(
@@ -79,7 +79,7 @@ export async function handleReportCommand(options: {
       migrationSelection.fromVersion,
       migrationSelection.toVersion,
       options.gitignore,
-      options.modelType as 'deepseek' | 'claude' | 'gpt'
+      options.modelType as 'deepseek' | 'claude' | 'gpt' | 'auto'
     );
   } catch (error) {
     console.error(chalk.red('\nAnalysis failed:'));
@@ -125,7 +125,7 @@ program
   )
   .option(
     '--modelType <type>',
-    'Model type to use: deepseek, claude, or gpt (defaults to deepseek)',
+    'Model type to use: deepseek, claude, gpt, or auto (defaults to deepseek)',
     'deepseek'
   )
   .action(handleReportCommand);

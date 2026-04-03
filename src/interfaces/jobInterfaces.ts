@@ -1,7 +1,7 @@
 import { Product } from './migrationInterfaces.js';
 
 export interface JobInitiateRequest {
-  modelType?: 'deepseek' | 'claude' | 'gpt';
+  modelType?: 'deepseek' | 'claude' | 'gpt' | 'auto';
   product: Product;
   fromVersion: string;
   toVersion: string;
